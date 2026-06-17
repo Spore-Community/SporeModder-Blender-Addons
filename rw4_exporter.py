@@ -3,6 +3,7 @@ __author__ = 'Eric'
 import bpy
 from . import rw4_base, rw4_enums, file_io, rw4_validation
 from . import rw4_material_config
+from . import anim_compat
 from mathutils import Matrix, Quaternion, Vector
 from random import choice
 import re
@@ -996,7 +997,7 @@ class RW4Exporter:
 		fcurves_by_id = {}
 		
 		# Shape keys don't use groups
-		for fcurve in action.fcurves:
+		for fcurve in anim_compat.iter_fcurves(action):
 			match = re.search(r'\["([a-zA-Z_\-\s0-9.]+)"\]', fcurve.data_path)
 			channel_id = file_io.get_hash(match.group(1))
 			
@@ -1055,7 +1056,7 @@ class RW4Exporter:
 	def process_skeleton_action(self, action, keyframe_anim):
 		# 1. Get all possible keyframe times
 		keyframe_times = {0}  # Ensure frame 0 is always there
-		for group in action.groups:
+		for group in anim_compat.channelbag_for(action, 'OBJECT').groups:
 			for channel in group.channels:
 				for kf in channel.keyframe_points:
 					keyframe_times.add(int(kf.co[0]))
@@ -1151,7 +1152,7 @@ class RW4Exporter:
 		used_actions = {}
 		actions = bpy.data.actions
 		for action in actions:
-			if not action.fcurves or action in ignored_actions:
+			if not any(anim_compat.iter_fcurves(action)) or action in ignored_actions:
 				continue
 
 			if action.frame_range[0] != 0:
@@ -1164,7 +1165,7 @@ class RW4Exporter:
 				if error not in self.warnings:
 					self.warnings.add(error)
 
-			is_shape_key = action.id_root == 'KEY'
+			is_shape_key = anim_compat.get_target_id_type(action) == 'KEY'
 
 			# Armature
 			if not is_shape_key:
@@ -1202,7 +1203,7 @@ class RW4Exporter:
 			if is_shape_key:
 				self.process_blend_shape_action(action, keyframe_anim)
 			else:
-				self.b_armature_object.animation_data.action = action
+				anim_compat.assign_action(self.b_armature_object, action, 'OBJECT')
 				self.process_skeleton_action(action, keyframe_anim)
 
 			# Remove trailing numbers from action name
@@ -1572,7 +1573,7 @@ def export_rw4_symmetric(file, armatures, meshes, armature_actions, shape_keys_a
 		# Assign the new action to the armature
 		if not armature_obj.animation_data:
 			armature_obj.animation_data_create()
-		armature_obj.animation_data.action = mirrored_action
+		anim_compat.assign_action(armature_obj, mirrored_action, 'OBJECT')
 
 		# Pose mode
 		armature_obj.select_set(True)
@@ -1615,7 +1616,7 @@ def export_rw4_symmetric(file, armatures, meshes, armature_actions, shape_keys_a
 			bpy.ops.pose.select_all(action='DESELECT')
 
 		# Remove the mirrored action from the armature
-		armature_obj.animation_data.action = action
+		anim_compat.assign_action(armature_obj, action, 'OBJECT')
 
 		return mirrored_action
 
