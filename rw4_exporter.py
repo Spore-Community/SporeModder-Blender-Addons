@@ -1349,7 +1349,51 @@ def can_export_object(obj):
 		# Do not export hidden meshes
 		if obj.hide_get(): 
 			return False
+
+	# Do not export objects that are only in disabled collections
+	if not object_in_enabled_collection(obj):
+		return False
+
 	return True
+
+
+def object_in_enabled_collection(obj):
+	"""Return True if the object belongs to at least one collection that is enabled
+	(not excluded/hidden) in the current view layer. If the object is in any such
+	collection, consider it exportable from a collection-visibility standpoint.
+	"""
+	try:
+		view_layer = bpy.context.view_layer
+		root_layer_coll = view_layer.layer_collection
+	except Exception:
+		# Fallback: assume visible
+		return True
+
+	def find_layer_collection(layer_coll, target_coll):
+		if layer_coll.collection == target_coll:
+			return layer_coll
+		for child in layer_coll.children:
+			found = find_layer_collection(child, target_coll)
+			if found:
+				return found
+		return None
+
+	# If object is not linked to any collection, treat as visible
+	if not obj.users_collection:
+		return True
+
+	for coll in obj.users_collection:
+		layer_coll = find_layer_collection(root_layer_coll, coll)
+		if layer_coll:
+			# layer_collection.exclude and layer_collection.hide_viewport indicate it's disabled in the view layer
+			if not getattr(layer_coll, 'exclude', False) and not getattr(layer_coll, 'hide_viewport', False) and not getattr(coll, 'hide_viewport', False):
+				return True
+		else:
+			# If the collection isn't present in the view layer hierarchy, fall back to the collection's own hide flag
+			if not getattr(coll, 'hide_viewport', False):
+				return True
+
+	return False
 
 def get_active_collection():
 	# Try selected collection
@@ -1653,6 +1697,16 @@ def export_rw4_symmetric(file, armatures, meshes, armature_actions, shape_keys_a
 				):
 					act = mirror_action(item, mirrored_arm)
 					mirrored_actions[act] = mirrored_arm
+
+	# Remove mirrored/related actions from ignored_actions so they are exported
+	# (shape-key actions are not copied, their original action objects are mapped
+	# in mirrored_shape_actions, so remove them from ignored_actions as well)
+	for a in list(mirrored_actions.keys()):
+		if a in ignored_actions:
+			ignored_actions.remove(a)
+	for a in list(mirrored_shape_actions.keys()):
+		if a in ignored_actions:
+			ignored_actions.remove(a)
 
 	# Start exporting
 	exporter_sym = RW4Exporter()
