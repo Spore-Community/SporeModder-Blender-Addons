@@ -8,7 +8,6 @@ from bpy.props import (BoolProperty,
 					   )
 import bpy
 import gpu
-import bgl
 from mathutils import Vector, Matrix
 from gpu_extras.batch import batch_for_shader
 
@@ -224,10 +223,7 @@ class RW4AnimProperties(bpy.types.PropertyGroup):
 	def unregister(cls):
 		del bpy.types.Action.rw4
 
-if bpy.app.version[0] == 4:
-	shader = gpu.shader.from_builtin('UNIFORM_COLOR')
-else:
-	shader = gpu.shader.from_builtin('3D_UNIFORM_COLOR')
+shader = None
 BOX_COORDS = [
 		(-0.5, -0.5, +1), (+0.5, -0.5, +1),
 		(+0.5, +0.5, +1), (-0.5, +0.5, +1),
@@ -250,6 +246,9 @@ def is_anim_panel_showing():
 
 
 def handle_draw_callback():
+	global shader
+	if shader is None:
+		shader = gpu.shader.from_builtin('UNIFORM_COLOR')
 	if not bpy.data.actions:
 		return
 	action = bpy.data.actions[bpy.context.scene.rw4_list_index]
@@ -271,10 +270,7 @@ def handle_draw_callback():
 	matrix = Vector((0, 0, 1)).rotation_difference(direction).to_matrix()
 	matrix = Matrix.Translation(action.rw4.initial_pos) @ (matrix @ scale_matrix).to_4x4()
 
-	bgl.glEnable(bgl.GL_BLEND)
-	bgl.glEnable(bgl.GL_LINE_SMOOTH)
-	bgl.glEnable(bgl.GL_POLYGON_SMOOTH)
-	bgl.glBlendFunc(bgl.GL_SRC_ALPHA, bgl.GL_ONE_MINUS_SRC_ALPHA)
+	gpu.state.blend_set('ALPHA')
 
 	shader.bind()
 	shader.uniform_float("color", (109/255.0, 141/255.0, 143/255.0, 0.4))
