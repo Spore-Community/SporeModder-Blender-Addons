@@ -489,10 +489,11 @@ def register():
 
 
 def unregister():
-	global _draw_handler
+	global _draw_handler, shader
 	if _draw_handler is not None:
 		bpy.types.SpaceView3D.draw_handler_remove(_draw_handler, 'WINDOW')
 		_draw_handler = None
+	shader = None
 
 	bpy.utils.unregister_class(SPORE_PT_rw_anims)
 	bpy.utils.unregister_class(RW4AnimProperties)
