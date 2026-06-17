@@ -1603,12 +1603,12 @@ def export_rw4_symmetric(file, armatures, meshes, armature_actions, shape_keys_a
 				if frame in frames:
 					pb = armature_obj.pose.bones.get(bone_name)
 					if pb:
-						pb.bone.select = True
-			if any(pb.bone.select for pb in armature_obj.pose.bones):
+						pb.select = True
+			if any(pb.select for pb in armature_obj.pose.bones):
 				bpy.ops.pose.copy()
 				bpy.ops.pose.paste(flipped=True)
 				for pb in armature_obj.pose.bones:
-					if pb.bone.select:
+					if pb.select:
 						pb.keyframe_insert(data_path="location")
 						pb.keyframe_insert(data_path="rotation_quaternion")
 						pb.keyframe_insert(data_path="rotation_euler")
