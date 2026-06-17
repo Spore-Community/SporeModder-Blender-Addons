@@ -1,4 +1,5 @@
 import bpy
+from . import anim_compat
 
 from bpy.props import (BoolProperty,
 					   IntProperty,
@@ -137,7 +138,7 @@ def get_default_handle_position(name):
 			current_actions.append(obj.data.shape_keys.animation_data.action)
 			obj.data.shape_keys.animation_data.action = None
 
-	is_shape_key = action.id_root == 'KEY'
+	is_shape_key = anim_compat.get_target_id_type(action) == 'KEY'
 	if not is_shape_key:
 		for obj in bpy.data.objects:
 			if obj.type == 'ARMATURE' and obj.animation_data is not None:
