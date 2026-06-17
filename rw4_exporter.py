@@ -1582,7 +1582,7 @@ def export_rw4_symmetric(file, armatures, meshes, armature_actions, shape_keys_a
 
 		# Collect all keyed bones and their keyed frames
 		bone_keyframes = {}
-		for fcurve in mirrored_action.fcurves:
+		for fcurve in anim_compat.iter_fcurves(mirrored_action):
 			if fcurve.data_path.startswith('pose.bones'):
 				bone_name = fcurve.data_path.split('"')[1]
 				if bone_name not in bone_keyframes:
@@ -1648,7 +1648,7 @@ def export_rw4_symmetric(file, armatures, meshes, armature_actions, shape_keys_a
 			for item in armature_actions:
 				if (
 					armature_actions[item] == obj
-					and getattr(item, "id_root", None) == 'OBJECT'
+					and anim_compat.get_target_id_type(item) == 'OBJECT'
 				):
 					act = mirror_action(item, mirrored_arm)
 					mirrored_actions[act] = mirrored_arm
