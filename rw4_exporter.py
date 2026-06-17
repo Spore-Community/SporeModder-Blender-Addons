@@ -906,19 +906,23 @@ class RW4Exporter:
 		if bbone.parent is None:
 			bone.flags = rw4_base.SkeletonBone.TYPE_ROOT
 		else:
-			# If it's a leaf (no children)
+			# The skeleton is written as a flat DFS list; the importer rebuilds
+			# the hierarchy with a flag-driven stack (rw4_importer.process_animation):
+			# BRANCH pushes the parent context, LEAF pops it, ROOT replaces it
+			# without pushing, BRANCH_LEAF is a no-op. A bone only needs a push
+			# (BRANCH/BRANCH_LEAF) when a following sibling must return to the
+			# shared parent — i.e. when it is NOT the last child. Keying on
+			# "is last child" (matching the order children are written below) is
+			# what keeps the stack balanced; keying on "parent has >1 children"
+			# wrongly marked last children as BRANCH and reparented their
+			# siblings on re-import.
+			is_last_child = bbone.parent.children[-1].name == bbone.name
 			if not bbone.children:
-				# If it's not the only children
-				if len(bbone.parent.children) > 1:
-					bone.flags = rw4_base.SkeletonBone.TYPE_BRANCH_LEAF
-				else:
-					bone.flags = rw4_base.SkeletonBone.TYPE_LEAF
-
-			# If it's not the only children
-			elif len(bbone.parent.children) > 1:
-				bone.flags = rw4_base.SkeletonBone.TYPE_BRANCH
+				bone.flags = (rw4_base.SkeletonBone.TYPE_LEAF if is_last_child
+							  else rw4_base.SkeletonBone.TYPE_BRANCH_LEAF)
 			else:
-				bone.flags = rw4_base.SkeletonBone.TYPE_ROOT
+				bone.flags = (rw4_base.SkeletonBone.TYPE_ROOT if is_last_child
+							  else rw4_base.SkeletonBone.TYPE_BRANCH)
 
 		self.skin_matrix_buffer.data.append(Matrix.Identity(4))
 		self.animation_skin.data.append(self.create_animation_skin(bbone))
@@ -1051,8 +1055,6 @@ class RW4Exporter:
 				channel.new_keyframe(keyframe_anim.length).factor = 0.0
 
 
-	# TODO: Fix bone positions when parent bone has multiple children.
-	# The child bones that are affected are the ones sorted alphabetically after the unaffected child bone
 	def process_skeleton_action(self, action, keyframe_anim):
 		# 1. Get all possible keyframe times
 		keyframe_times = {0}  # Ensure frame 0 is always there
