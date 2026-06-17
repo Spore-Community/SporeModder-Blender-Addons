@@ -142,12 +142,12 @@ def get_default_handle_position(name):
 	if not is_shape_key:
 		for obj in bpy.data.objects:
 			if obj.type == 'ARMATURE' and obj.animation_data is not None:
-				obj.animation_data.action = action
+				anim_compat.assign_action(obj, action, 'OBJECT')
 	else:
 		for obj in bpy.data.objects:
 			if obj.type == 'MESH' and obj.data.shape_keys is not None and \
 					obj.data.shape_keys.animation_data is not None:
-				obj.data.shape_keys.animation_data.action = action
+				anim_compat.assign_action(obj.data.shape_keys, action, 'KEY')
 
 	bpy.context.scene.frame_set(int(action.frame_range[0]))
 	bbox1 = calc_global_bbox()
@@ -165,9 +165,15 @@ def get_default_handle_position(name):
 	# Restore actions
 	for obj, act in zip(bpy.data.objects, current_actions):
 		if obj.type == 'ARMATURE' and obj.animation_data is not None:
-			obj.animation_data.action = act
+			if act is not None:
+				anim_compat.assign_action(obj, act, 'OBJECT')
+			else:
+				obj.animation_data.action = None
 		elif obj.type == 'MESH' and obj.data.shape_keys is not None and obj.data.shape_keys.animation_data is not None:
-			obj.data.shape_keys.animation_data.action = act
+			if act is not None:
+				anim_compat.assign_action(obj.data.shape_keys, act, 'KEY')
+			else:
+				obj.data.shape_keys.animation_data.action = None
 	bpy.context.scene.frame_set(current_keyframe)
 	return initial_pos, final_pos
 
@@ -318,7 +324,7 @@ class SPORE_UL_rw_anims(bpy.types.UIList):
 
 	def filter_items(self, context, data, propname):
 		items = getattr(data, propname)
-		new_items = sorted(filter(lambda x: x.fcurves, items), key=lambda x: x.name)
+		new_items = sorted(filter(lambda x: any(anim_compat.iter_fcurves(x)), items), key=lambda x: x.name)
 		filter_flags = [self.bitflag_filter_item if item in new_items else 0 for item in items]
 		filter_neworder = [new_items.index(item) if item in new_items else 0 for item in items]
 		return filter_flags, filter_neworder
@@ -394,9 +400,7 @@ class SPORE_OT_generate_morph_nudge(bpy.types.Operator):
 		current_frame = bpy.context.scene.frame_current
 
 		action = bpy.data.actions.new(name="Nudge")
-		if not armature_obj.animation_data:
-			armature_obj.animation_data_create()
-		armature_obj.animation_data.action = action
+		anim_compat.assign_action(armature_obj, action, 'OBJECT')
 
 		# Insert keyframes for root bone pose location
 		bpy.context.view_layer.objects.active = armature_obj
@@ -409,9 +413,9 @@ class SPORE_OT_generate_morph_nudge(bpy.types.Operator):
 
 		# Deselect all pose bones
 		for pb in armature_obj.pose.bones:
-			pb.bone.select = False
+			pb.select = False
 		# Select only the root bone
-		pose_bone.bone.select = True
+		pose_bone.select = True
 
 		# Frame 0: +Y
 		bpy.context.scene.frame_set(0)
@@ -424,7 +428,7 @@ class SPORE_OT_generate_morph_nudge(bpy.types.Operator):
 		bpy.ops.anim.keyframe_insert_menu(type='Location')
 
 		# Set interpolation to linear for all location keyframes of the root bone
-		action_fcurves = [fc for fc in action.fcurves if fc.data_path == f'pose.bones["{root_bone.name}"].location']
+		action_fcurves = [fc for fc in anim_compat.iter_fcurves(action) if fc.data_path == f'pose.bones["{root_bone.name}"].location']
 		for fc in action_fcurves:
 			for kp in fc.keyframe_points:
 				kp.interpolation = 'LINEAR'
