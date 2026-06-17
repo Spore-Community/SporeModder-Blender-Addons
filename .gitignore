@@ -8,3 +8,5 @@ materials/static_model_3texture.py
 
 # Spore proprietary test assets — do not commit
 _test/*.rw4
+
+sporemodder_addons_updater/

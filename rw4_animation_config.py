@@ -12,6 +12,11 @@ import gpu
 from mathutils import Vector, Matrix
 from gpu_extras.batch import batch_for_shader
 
+# bgl was removed in Blender 4.0; only needed to set blend state on very old
+# builds that predate gpu.state.blend_set (< 2.91).
+if bpy.app.version < (2, 91):
+	import bgl
+
 DIRECTION_FACTORIES = {
 	'+X': lambda bbox: (bbox[1].x - bbox[0].x, 0.0, 0.0),
 	'-X': lambda bbox: (-(bbox[1].x - bbox[0].x), 0.0, 0.0),
@@ -255,7 +260,9 @@ def is_anim_panel_showing():
 def handle_draw_callback():
 	global shader
 	if shader is None:
-		shader = gpu.shader.from_builtin('UNIFORM_COLOR')
+		# The builtin shader was renamed '3D_UNIFORM_COLOR' -> 'UNIFORM_COLOR' in 3.4.
+		name = 'UNIFORM_COLOR' if bpy.app.version >= (3, 4) else '3D_UNIFORM_COLOR'
+		shader = gpu.shader.from_builtin(name)
 	if not bpy.data.actions:
 		return
 	action = bpy.data.actions[bpy.context.scene.rw4_list_index]
@@ -277,7 +284,13 @@ def handle_draw_callback():
 	matrix = Vector((0, 0, 1)).rotation_difference(direction).to_matrix()
 	matrix = Matrix.Translation(action.rw4.initial_pos) @ (matrix @ scale_matrix).to_4x4()
 
-	gpu.state.blend_set('ALPHA')
+	if bpy.app.version >= (2, 91):
+		gpu.state.blend_set('ALPHA')
+	else:
+		bgl.glEnable(bgl.GL_BLEND)
+		bgl.glEnable(bgl.GL_LINE_SMOOTH)
+		bgl.glEnable(bgl.GL_POLYGON_SMOOTH)
+		bgl.glBlendFunc(bgl.GL_SRC_ALPHA, bgl.GL_ONE_MINUS_SRC_ALPHA)
 
 	shader.bind()
 	shader.uniform_float("color", (109/255.0, 141/255.0, 143/255.0, 0.4))
