@@ -348,6 +348,7 @@ SPORE_NAMES = {
 	0x89332E8D: 'tail_3',
 	0x41945228: 'neck',
 	0x2E8647BD: 'jaw',
+	0x0AC4AEEE: 'attach',
 	0x36932030: 'eye',
 	0x4C56A3AF: 'pupil',
 	0xB8F49CF3: 'eyelid_a',
