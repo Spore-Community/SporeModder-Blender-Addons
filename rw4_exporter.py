@@ -3,7 +3,6 @@ __author__ = 'Eric'
 import bpy
 from . import rw4_base, rw4_enums, file_io, rw4_validation
 from . import rw4_material_config
-from . import anim_compat
 from mathutils import Matrix, Quaternion, Vector
 from random import choice
 import re
@@ -906,23 +905,19 @@ class RW4Exporter:
 		if bbone.parent is None:
 			bone.flags = rw4_base.SkeletonBone.TYPE_ROOT
 		else:
-			# The skeleton is written as a flat DFS list; the importer rebuilds
-			# the hierarchy with a flag-driven stack (rw4_importer.process_animation):
-			# BRANCH pushes the parent context, LEAF pops it, ROOT replaces it
-			# without pushing, BRANCH_LEAF is a no-op. A bone only needs a push
-			# (BRANCH/BRANCH_LEAF) when a following sibling must return to the
-			# shared parent — i.e. when it is NOT the last child. Keying on
-			# "is last child" (matching the order children are written below) is
-			# what keeps the stack balanced; keying on "parent has >1 children"
-			# wrongly marked last children as BRANCH and reparented their
-			# siblings on re-import.
-			is_last_child = bbone.parent.children[-1].name == bbone.name
+			# If it's a leaf (no children)
 			if not bbone.children:
-				bone.flags = (rw4_base.SkeletonBone.TYPE_LEAF if is_last_child
-							  else rw4_base.SkeletonBone.TYPE_BRANCH_LEAF)
+				# If it's not the only children
+				if len(bbone.parent.children) > 1:
+					bone.flags = rw4_base.SkeletonBone.TYPE_BRANCH_LEAF
+				else:
+					bone.flags = rw4_base.SkeletonBone.TYPE_LEAF
+
+			# If it's not the only children
+			elif len(bbone.parent.children) > 1:
+				bone.flags = rw4_base.SkeletonBone.TYPE_BRANCH
 			else:
-				bone.flags = (rw4_base.SkeletonBone.TYPE_ROOT if is_last_child
-							  else rw4_base.SkeletonBone.TYPE_BRANCH)
+				bone.flags = rw4_base.SkeletonBone.TYPE_ROOT
 
 		self.skin_matrix_buffer.data.append(Matrix.Identity(4))
 		self.animation_skin.data.append(self.create_animation_skin(bbone))
@@ -1001,7 +996,7 @@ class RW4Exporter:
 		fcurves_by_id = {}
 		
 		# Shape keys don't use groups
-		for fcurve in anim_compat.iter_fcurves(action):
+		for fcurve in action.fcurves:
 			match = re.search(r'\["([a-zA-Z_\-\s0-9.]+)"\]', fcurve.data_path)
 			channel_id = file_io.get_hash(match.group(1))
 			
@@ -1055,10 +1050,12 @@ class RW4Exporter:
 				channel.new_keyframe(keyframe_anim.length).factor = 0.0
 
 
+	# TODO: Fix bone positions when parent bone has multiple children.
+	# The child bones that are affected are the ones sorted alphabetically after the unaffected child bone
 	def process_skeleton_action(self, action, keyframe_anim):
 		# 1. Get all possible keyframe times
 		keyframe_times = {0}  # Ensure frame 0 is always there
-		for group in anim_compat.channelbag_for(action, 'OBJECT').groups:
+		for group in action.groups:
 			for channel in group.channels:
 				for kf in channel.keyframe_points:
 					keyframe_times.add(int(kf.co[0]))
@@ -1154,7 +1151,7 @@ class RW4Exporter:
 		used_actions = {}
 		actions = bpy.data.actions
 		for action in actions:
-			if not any(anim_compat.iter_fcurves(action)) or action in ignored_actions:
+			if not action.fcurves or action in ignored_actions:
 				continue
 
 			if action.frame_range[0] != 0:
@@ -1167,7 +1164,7 @@ class RW4Exporter:
 				if error not in self.warnings:
 					self.warnings.add(error)
 
-			is_shape_key = anim_compat.get_target_id_type(action) == 'KEY'
+			is_shape_key = action.id_root == 'KEY'
 
 			# Armature
 			if not is_shape_key:
@@ -1205,7 +1202,7 @@ class RW4Exporter:
 			if is_shape_key:
 				self.process_blend_shape_action(action, keyframe_anim)
 			else:
-				anim_compat.assign_action(self.b_armature_object, action, 'OBJECT')
+				self.b_armature_object.animation_data.action = action
 				self.process_skeleton_action(action, keyframe_anim)
 
 			# Remove trailing numbers from action name
@@ -1575,7 +1572,7 @@ def export_rw4_symmetric(file, armatures, meshes, armature_actions, shape_keys_a
 		# Assign the new action to the armature
 		if not armature_obj.animation_data:
 			armature_obj.animation_data_create()
-		anim_compat.assign_action(armature_obj, mirrored_action, 'OBJECT')
+		armature_obj.animation_data.action = mirrored_action
 
 		# Pose mode
 		armature_obj.select_set(True)
@@ -1584,7 +1581,7 @@ def export_rw4_symmetric(file, armatures, meshes, armature_actions, shape_keys_a
 
 		# Collect all keyed bones and their keyed frames
 		bone_keyframes = {}
-		for fcurve in anim_compat.iter_fcurves(mirrored_action):
+		for fcurve in mirrored_action.fcurves:
 			if fcurve.data_path.startswith('pose.bones'):
 				bone_name = fcurve.data_path.split('"')[1]
 				if bone_name not in bone_keyframes:
@@ -1605,12 +1602,12 @@ def export_rw4_symmetric(file, armatures, meshes, armature_actions, shape_keys_a
 				if frame in frames:
 					pb = armature_obj.pose.bones.get(bone_name)
 					if pb:
-						pb.select = True
-			if any(pb.select for pb in armature_obj.pose.bones):
+						pb.bone.select = True
+			if any(pb.bone.select for pb in armature_obj.pose.bones):
 				bpy.ops.pose.copy()
 				bpy.ops.pose.paste(flipped=True)
 				for pb in armature_obj.pose.bones:
-					if pb.select:
+					if pb.bone.select:
 						pb.keyframe_insert(data_path="location")
 						pb.keyframe_insert(data_path="rotation_quaternion")
 						pb.keyframe_insert(data_path="rotation_euler")
@@ -1618,7 +1615,7 @@ def export_rw4_symmetric(file, armatures, meshes, armature_actions, shape_keys_a
 			bpy.ops.pose.select_all(action='DESELECT')
 
 		# Remove the mirrored action from the armature
-		anim_compat.assign_action(armature_obj, action, 'OBJECT')
+		armature_obj.animation_data.action = action
 
 		return mirrored_action
 
@@ -1650,7 +1647,7 @@ def export_rw4_symmetric(file, armatures, meshes, armature_actions, shape_keys_a
 			for item in armature_actions:
 				if (
 					armature_actions[item] == obj
-					and anim_compat.get_target_id_type(item) == 'OBJECT'
+					and getattr(item, "id_root", None) == 'OBJECT'
 				):
 					act = mirror_action(item, mirrored_arm)
 					mirrored_actions[act] = mirrored_arm

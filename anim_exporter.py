@@ -1,7 +1,6 @@
 import bpy
 import mathutils
 from . import anim_bone_config, mod_paths
-from . import anim_compat
 from .message_box import show_message_box
 
 def requirements_to_string(item):
@@ -316,7 +315,7 @@ def export_anim(file):
 	keyframe_times = {0}  # Ensure frame 0 is always there
 	for action in [bones_action, deforms_action]:
 		if action is not None:
-			for fcurve in anim_compat.iter_fcurves(action):
+			for fcurve in action.fcurves:
 				for kf in fcurve.keyframe_points:
 					keyframe_times.add(int(kf.co[0]))
 

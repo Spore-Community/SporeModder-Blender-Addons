@@ -7,7 +7,6 @@ from mathutils import Matrix, Vector
 from .prop_base import PropFile
 from . import mod_paths
 from .message_box import show_message_box
-from . import anim_compat
 
 def import_muscle_group(filepath, curve_name, filepath_max=None):
 	"""
@@ -278,13 +277,14 @@ def generate_minmax_action(collection):
 			key_block = obj.data.shape_keys.key_blocks.get("max")
 			if key_block:
 				# Ensure animation data exists
-				anim_compat.assign_action(obj.data.shape_keys, action, 'KEY')
-				channelbag = anim_compat.channelbag_for(action, 'KEY')
+				if not obj.data.shape_keys.animation_data:
+					obj.data.shape_keys.animation_data_create()
+				obj.data.shape_keys.animation_data.action = action
 
 				data_path = key_block.path_from_id("value")
-				fcurve = channelbag.fcurves.find(data_path)
+				fcurve = action.fcurves.find(data_path)
 				if not fcurve:
-					fcurve = channelbag.fcurves.new(data_path)
+					fcurve = action.fcurves.new(data_path)
 				# Insert keyframes for value 0 at frame 0 and value 1 at frame 30
 				fcurve.keyframe_points.insert(0, 0)
 				fcurve.keyframe_points.insert(30, 1)

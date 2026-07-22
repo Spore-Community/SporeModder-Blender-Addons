@@ -8,7 +8,7 @@ import os
 bl_info = {
 	"name": "SporeModder Add-ons",
 	"author": "emd4600, Valla-Chan",
-	"blender": (2, 80, 0), # supports 2.8 through 5.x (version-gated)
+	"blender": (4, 5, 0), # 2.8 - 4.5
 	"version": (2, 7, 2),
 	"location": "File > Import-Export",
 	"description": "Import Spore .gmdl, .rw4, and .prop.prop_t formats. Export .rw4, .anim_t, and .prop.prop_t formats.",
