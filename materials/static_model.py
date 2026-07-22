@@ -197,5 +197,7 @@ class StaticModel(RWMaterial):
 			material.node_tree.links.new(material.node_tree.nodes["Principled BSDF"].inputs["Normal"],
 										 normal_map_node.outputs["Normal"])
 
-			material.node_tree.links.new(material.node_tree.nodes["Principled BSDF"].inputs["Specular"],
+			# The Principled BSDF "Specular" input was renamed to "Specular IOR Level" in Blender 4.0.
+			specular_input = "Specular IOR Level" if bpy.app.version >= (4, 0) else "Specular"
+			material.node_tree.links.new(material.node_tree.nodes["Principled BSDF"].inputs[specular_input],
 										 texture_node.outputs["Alpha"])
