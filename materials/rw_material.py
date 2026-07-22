@@ -35,13 +35,11 @@ class RWMaterial(bpy.types.PropertyGroup):
 		
 		if material.material_color is not None:
 			rw4_material.material_color = material.material_color
-		
+			
 		if material.ambient_color is not None:
 			rw4_material.ambient_color = material.ambient_color
-		
-		alpha = material.detect_render_states()
-		if alpha is not None:
-			rw4_material.alpha_type = alpha
+			
+		rw4_material.alpha_type = material.detect_render_states()
 		
 		return False  # return True if the material was of the specified type
 

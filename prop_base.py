@@ -268,7 +268,6 @@ class PropFile():
 
 		values = []
 		for item in data_array:
-			item = item.split("#")[0]
 			# bool
 			if is_type(type, prop_bool):
 				values.append(item.lower() == 'true' or item.lower() == '1')
