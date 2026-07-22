@@ -1,7 +1,6 @@
 __author__ = 'Eric'
 
 from . import rw4_base, rw4_enums, rw4_material_config
-from . import anim_compat
 from .materials import rw_material_builder
 from .file_io import FileReader, FileWriter, ArrayFileReader, get_name
 from mathutils import Matrix, Quaternion, Vector
@@ -518,19 +517,18 @@ class RW4Importer:
 		return channel_keyframes
 
 	def import_animation_shape_key(self, animation, b_action):
-		channelbag = anim_compat.channelbag_for(b_action, 'KEY')
 		for channel in animation.channels:
 			#TODO get from animation skeleton id? Theorically there should be a single mesh object
 			key = self.b_meshes[0].shape_keys.key_blocks[get_name(channel.channel_id)]
 			data_path = key.path_from_id('value')
-			fcurve = channelbag.fcurves.new(data_path)
+			fcurve = b_action.fcurves.new(data_path)
 			for keyframe in channel.keyframes:
 				time = keyframe.time * rw4_base.KeyframeAnim.FPS
 				fcurve.keyframe_points.insert(time, keyframe.factor)
 
 	@staticmethod
 	def import_animation_channel(
-			b_pose_bone, channelbag, b_action_group, channel, index, channel_keyframes):
+			b_pose_bone, b_action, b_action_group, channel, index, channel_keyframes):
 
 		import_locrot = channel.keyframe_class in (rw4_base.LocRotScaleKeyframe, rw4_base.LocRotKeyframe)
 		import_scale = channel.keyframe_class == rw4_base.LocRotScaleKeyframe
@@ -542,20 +540,20 @@ class RW4Importer:
 		if import_locrot:
 			data_path = b_pose_bone.path_from_id('rotation_quaternion')
 			for i in range(4):
-				fcurve = channelbag.fcurves.new(data_path, index=i)
+				fcurve = b_action.fcurves.new(data_path, index=i)
 				fcurve.group = b_action_group
 				fcurves_qr.append(fcurve)
 
 			data_path = b_pose_bone.path_from_id('location')
 			for i in range(3):
-				fcurve = channelbag.fcurves.new(data_path, index=i)
+				fcurve = b_action.fcurves.new(data_path, index=i)
 				fcurve.group = b_action_group
 				fcurves_vt.append(fcurve)
 
 		if import_scale:
 			data_path = b_pose_bone.path_from_id('scale')
 			for i in range(3):
-				fcurve = channelbag.fcurves.new(data_path, index=i)
+				fcurve = b_action.fcurves.new(data_path, index=i)
 				fcurve.group = b_action_group
 				fcurves_vs.append(fcurve)
 
@@ -633,31 +631,36 @@ class RW4Importer:
 
 		if is_shape_key:
 			bpy.context.view_layer.objects.active = self.b_mesh_objects[0]
-			anim_compat.assign_action(self.b_meshes[0].shape_keys, b_action, 'KEY')
+			self.b_meshes[0].shape_keys.animation_data_create()
+			self.b_meshes[0].shape_keys.animation_data.action = b_action
+
+			b_action.id_root = 'KEY'
 
 			self.import_animation_shape_key(animation, b_action)
 
 		else:
+			b_action.id_root = 'OBJECT'
+
 			bpy.context.view_layer.objects.active = self.b_armature_object
 			bpy.ops.object.mode_set(mode='POSE')
 
-			anim_compat.assign_action(self.b_armature_object, b_action, 'OBJECT')
-			channelbag = anim_compat.channelbag_for(b_action, 'OBJECT')
+			self.b_armature_object.animation_data_create()
+			self.b_armature_object.animation_data.action = b_action
 
 			bpy.ops.object.mode_set(mode='POSE')
 			bpy.context.scene.frame_set(0)
-			for bone in self.b_armature_object.pose.bones:
+			for bone in self.b_armature.bones:
 				bone.select = True
 			bpy.ops.pose.transforms_clear()
 
 			channel_keyframes = self.process_animation(animation)
 			for c, channel in enumerate(animation.channels):
 				b_pose_bone = self.b_armature_object.pose.bones[c]
-				b_action_group = channelbag.groups.new(b_pose_bone.name)
+				b_action_group = b_action.groups.new(b_pose_bone.name)
 
 				RW4Importer.import_animation_channel(
 					b_pose_bone,
-					channelbag,
+					b_action,
 					b_action_group,
 					channel,
 					c,
@@ -680,7 +683,7 @@ class RW4Importer:
 				self.b_armature_object.animation_data_create()
 			nla_tracks = self.b_armature_object.animation_data.nla_tracks
 			for action in self.b_animation_actions:
-				if anim_compat.get_target_id_type(action) != 'KEY':
+				if action.id_root != 'KEY':
 					# Avoid duplicate strips for the same action
 					if not any(strip.action == action for track in nla_tracks for strip in track.strips):
 						track = nla_tracks.new()
@@ -696,7 +699,7 @@ class RW4Importer:
 					b_object.data.shape_keys.animation_data_create()
 				nla_tracks = b_object.data.shape_keys.animation_data.nla_tracks
 				for action in self.b_animation_actions:
-					if anim_compat.get_target_id_type(action) == 'KEY':
+					if action.id_root == 'KEY':
 						if not any(strip.action == action for track in nla_tracks for strip in track.strips):
 							track = nla_tracks.new()
 							track.name = action.name
