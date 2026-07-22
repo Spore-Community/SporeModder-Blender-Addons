@@ -17,6 +17,8 @@ def error_too_many_bones(obj):
 def error_not_normalized(obj):
 	return f"Mesh {obj.name} weights are not normalized."
 
+def error_not_normalized_weight(obj, total_weight):
+	return f"Mesh {obj.name} weights are not normalized. Total weight: {total_weight}."
 
 def error_bone_weight_limit(mesh, bone_name):
 	return f"Mesh {mesh.name} has some vertices assigned to bone {bone_name} with a weight greater than 1.0"

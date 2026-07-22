@@ -2,8 +2,8 @@ import os
 import zipfile
 
 def create_zip():
-	blender_version = 4
-	blacklist = {".git", ".vscode", "__pycache__", "userscripts", "sporemodder-blender-addons_updater"}
+	blender_version = 5
+	blacklist = {".git", ".vscode", "__pycache__", "_test", "userscripts", "sporemodder-blender-addons_updater"}
 
 	script_path = os.path.abspath(__file__)
 	script_dir = os.path.dirname(script_path)

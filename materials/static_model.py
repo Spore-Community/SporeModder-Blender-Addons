@@ -34,6 +34,14 @@ class StaticModel(RWMaterial):
 		subtype='FILE_PATH'
 	)
 
+	detail_texture: StringProperty(
+		name="Detail Texture",
+		description="The detail texture of this material, modulated over the diffuse texture"
+					" (leave empty if no texture desired)",
+		default="",
+		subtype='FILE_PATH'
+	)
+
 	material_params_1: FloatProperty(
 		name="Specular Exponent",
 		default=10
@@ -49,6 +57,19 @@ class StaticModel(RWMaterial):
 	)
 	material_params_4: FloatProperty(
 		name="Gloss",
+		default=0
+	)
+
+	#-- TINT OPTIONS -- #
+
+	tint_terrain: BoolProperty(
+		name="Terrain Tint",
+		description="Tints the model based on terrain color, masked visible by the diffuse alpha brightness.",
+		default=0
+	)
+	tint_deadterrain: BoolProperty(
+		name="Terrain Cliff Tint",
+		description="Tints the model based on terrain cliff color, masked visible by the diffuse alpha darkness.",
 		default=0
 	)
 
@@ -69,10 +90,14 @@ class StaticModel(RWMaterial):
 
 		layout.prop(data, 'diffuse_texture')
 		layout.prop(data, 'normal_texture')
+		layout.prop(data, 'detail_texture')
 		layout.prop(data, 'material_params_1')
 		layout.prop(data, 'material_params_2')
 		layout.prop(data, 'material_params_3')
 		layout.prop(data, 'material_params_4')
+		box = layout.box()
+		box.prop(data, 'tint_terrain')
+		box.prop(data, 'tint_deadterrain')
 
 	@staticmethod
 	def get_material_builder(exporter, rw4_material):
@@ -90,9 +115,11 @@ class StaticModel(RWMaterial):
 			material.FLAG3_RENDER_STATES = 0xc0000
 		# -- SHADER CONSTANTS -- #
 
+		shaderdata0 = 0x26445C02 if (not material_data.tint_deadterrain and not material_data.tint_terrain) else 0x26445C03
+
 		material.add_shader_data(SHADER_DATA['materialParams'], struct.pack(
 			'<iffff',
-			0x26445C02,
+			shaderdata0,
 			material_data.material_params_1,
 			material_data.material_params_2,
 			material_data.material_params_3,
@@ -102,7 +129,14 @@ class StaticModel(RWMaterial):
 		# Maybe not necessary: this makes it use vertex color?
 		# add showIdentityPS -hasData identityColor 0x218 -exclude 0x200
 		# add restoreAlphaPS -hasData 0x218 -exclude 0x200
-		material.add_shader_data(0x218, struct.pack('<i', 0x028B7C00))
+		if not material_data.tint_deadterrain and not material_data.tint_terrain:
+			material.add_shader_data(0x218, struct.pack('<i', 0x028B7C00))
+		else:
+			material.flags3 |= 0xc0000
+			if material_data.tint_terrain:
+				material.add_shader_data(SHADER_DATA['terrainTint'], struct.pack('<i', 0x41200000))
+			if material_data.tint_deadterrain:
+				material.add_shader_data(SHADER_DATA['deadTerrainTint'], struct.pack('<i', 0x41200000))
 
 		# -- RENDER STATES -- #
 		render_ware = exporter.render_ware
@@ -137,6 +171,13 @@ class StaticModel(RWMaterial):
 			texture_raster=exporter.add_texture(material_data.normal_texture),
 			disable_stage_op=True
 		))
+
+		if material_data.detail_texture != "":
+			material.texture_slots.append(RWTextureSlot(
+				sampler_index=2,
+				texture_raster=exporter.add_texture(material_data.detail_texture),
+				disable_texture_states=True
+			))
 
 		return material
 

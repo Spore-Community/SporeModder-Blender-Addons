@@ -188,9 +188,9 @@ ENUM_CAPABILITY = (
 
 
 ENUM_YES_NO_IGNORE = (
-	('ignore', "Ignore", "Don't use this as a requirement"),
-	('yes', "Yes", "The creature must have this"),
-	('no', "No", "The creature must NOT have this")
+    ('ignore', "Ignore", "Don't use this as a requirement"),
+    ('true', "Yes", "The creature must have this"),
+    ('false', "No", "The creature must NOT have this")
 )
 
 

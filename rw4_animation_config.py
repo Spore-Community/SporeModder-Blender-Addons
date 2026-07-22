@@ -110,6 +110,7 @@ DEFAULT_HANDLE_POSITIONS = {
 	'DeformAxisRight': (default_deform_axis, ['+X']),
 	'DeformAxisLeft': (default_deform_axis, ['-X']),
 	'DeformAxisUp': (default_deform_axis, ['+Z']),
+	'DeformAxisUpB': (default_deform_axis, ['+Z']),
 	'DeformAxisDown': (default_deform_axis, ['-Z']),
 	'DeformBoneBaseJoint': (default_deform_axis, ['+Z']),
 	'DeformBoneEndJoint': (default_deform_axis, ['+Z']),

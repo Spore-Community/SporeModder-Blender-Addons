@@ -9,32 +9,35 @@ from ..file_io import ArrayFileWriter, FileReader
 
 class RWTextureSlot:
 	"""
-	This class represents one texture slot of a material. The slot has a slot inedx, a reference to the
+	This class represents one texture slot of a material. The slot has a slot index, a reference to the
 	texture, and sampler/stage states.
 	"""
-	def __init__(self, sampler_index=0, texture_raster=None, set_default_states=True, disable_stage_op=False):
+	def __init__(self, sampler_index=0, texture_raster=None, set_default_states=True, disable_stage_op=False,
+			  disable_texture_states=False, disable_sampler_states=False):
 		self.texture_stage_states = OrderedDict()
 		self.sampler_states = OrderedDict()
 		self.texture_raster = texture_raster
 		self.sampler_index = sampler_index
 
 		if set_default_states:
-			if texture_raster is not None and not disable_stage_op:
-				self.texture_stage_states[rw4_enums.D3DTSS_COLOROP] = rw4_enums.D3DTOP_MODULATE
-				self.texture_stage_states[rw4_enums.D3DTSS_COLORARG1] = rw4_enums.D3DTA_TEXTURE
-				self.texture_stage_states[rw4_enums.D3DTSS_COLORARG2] = rw4_enums.D3DTA_DIFFUSE
-				self.texture_stage_states[rw4_enums.D3DTSS_ALPHAOP] = rw4_enums.D3DTOP_MODULATE
-				self.texture_stage_states[rw4_enums.D3DTSS_ALPHAARG1] = rw4_enums.D3DTA_TEXTURE
-				self.texture_stage_states[rw4_enums.D3DTSS_ALPHAARG2] = rw4_enums.D3DTA_DIFFUSE
-			else:
-				self.texture_stage_states[rw4_enums.D3DTSS_COLOROP] = rw4_enums.D3DTOP_DISABLE
-				self.texture_stage_states[rw4_enums.D3DTSS_ALPHAOP] = rw4_enums.D3DTOP_DISABLE
+			if not disable_texture_states:
+				if texture_raster is not None and not disable_stage_op:
+					self.texture_stage_states[rw4_enums.D3DTSS_COLOROP] = rw4_enums.D3DTOP_MODULATE
+					self.texture_stage_states[rw4_enums.D3DTSS_COLORARG1] = rw4_enums.D3DTA_TEXTURE
+					self.texture_stage_states[rw4_enums.D3DTSS_COLORARG2] = rw4_enums.D3DTA_DIFFUSE
+					self.texture_stage_states[rw4_enums.D3DTSS_ALPHAOP] = rw4_enums.D3DTOP_MODULATE
+					self.texture_stage_states[rw4_enums.D3DTSS_ALPHAARG1] = rw4_enums.D3DTA_TEXTURE
+					self.texture_stage_states[rw4_enums.D3DTSS_ALPHAARG2] = rw4_enums.D3DTA_DIFFUSE
+				else:
+					self.texture_stage_states[rw4_enums.D3DTSS_COLOROP] = rw4_enums.D3DTOP_DISABLE
+					self.texture_stage_states[rw4_enums.D3DTSS_ALPHAOP] = rw4_enums.D3DTOP_DISABLE
 
-			self.sampler_states[rw4_enums.D3DSAMP_ADDRESSU] = rw4_enums.D3DTADDRESS_WRAP
-			self.sampler_states[rw4_enums.D3DSAMP_ADDRESSV] = rw4_enums.D3DTADDRESS_WRAP
-			self.sampler_states[rw4_enums.D3DSAMP_MAGFILTER] = rw4_enums.D3DTEXF_LINEAR
-			self.sampler_states[rw4_enums.D3DSAMP_MINFILTER] = rw4_enums.D3DTEXF_LINEAR
-			self.sampler_states[rw4_enums.D3DSAMP_MIPFILTER] = rw4_enums.D3DTEXF_POINT
+			if not disable_sampler_states:
+				self.sampler_states[rw4_enums.D3DSAMP_ADDRESSU] = rw4_enums.D3DTADDRESS_WRAP
+				self.sampler_states[rw4_enums.D3DSAMP_ADDRESSV] = rw4_enums.D3DTADDRESS_WRAP
+				self.sampler_states[rw4_enums.D3DSAMP_MAGFILTER] = rw4_enums.D3DTEXF_LINEAR
+				self.sampler_states[rw4_enums.D3DSAMP_MINFILTER] = rw4_enums.D3DTEXF_LINEAR
+				self.sampler_states[rw4_enums.D3DSAMP_MIPFILTER] = rw4_enums.D3DTEXF_POINT
 
 
 ShaderData = namedtuple('ShaderData', ('index', 'offset', 'data'))
@@ -138,6 +141,7 @@ class RWMaterialBuilder:
 
 	FLAG3_RENDER_STATES = 0x20000
 	FLAG3_TEXTURE_SLOTS = 0x1FFFF
+	FLAG3_UNK1 = 0xC0000
 
 	def __init__(self):
 		self.material_color = None
@@ -150,6 +154,10 @@ class RWMaterialBuilder:
 		self.primitive_type = 4
 		# 17 booleans. If you don't want to use it, directly assign it to None
 		self.unknown_booleans = []
+
+		self.flags1 = 0
+		self.flags2 = 0
+		self.flags3 = 0
 
 	def get_shader_data(self, index):
 		for sh_data in self.shader_data:
@@ -170,9 +178,9 @@ class RWMaterialBuilder:
 
 	def write(self, render_ware, stream):
 
-		flags1 = 0
-		flags2 = 0
-		flags3 = 0
+		flags1 = self.flags1
+		flags2 = self.flags2
+		flags3 = self.flags3
 
 		# always used? don't really know what it does
 		flags1 |= 4
@@ -463,6 +471,15 @@ class RWMaterialBuilder:
 			self.render_states[rw4_enums.D3DRS_TEXTUREFACTOR] = (1, 1, 1, -0.00392156862745098)
 			self.render_states[rw4_enums.D3DRS_LIGHTING] = 0
 			self.render_states[rw4_enums.D3DRS_COLORWRITEENABLE] = 15
+
+		elif alpha_mode == 'PLANT_FRUIT':
+			self.render_states[rw4_enums.D3DRS_ZWRITEENABLE] = 1
+			self.render_states[rw4_enums.D3DRS_ALPHATESTENABLE] = 1
+			self.render_states[rw4_enums.D3DRS_SRCBLEND] = rw4_enums.D3DBLEND_SRCALPHA
+			self.render_states[rw4_enums.D3DRS_DESTBLEND] = rw4_enums.D3DBLEND_INVSRCALPHA
+			self.render_states[rw4_enums.D3DRS_CULLMODE] = rw4_enums.D3DCULL_CW
+			self.render_states[rw4_enums.D3DRS_ZFUNC] = rw4_enums.D3DCMP_LESSEQUAL
+			
 
 		else:
 			raise NameError("Unsupported render states %s" % alpha_mode)

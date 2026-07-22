@@ -330,7 +330,7 @@ class RW4Exporter:
 				error = rw4_validation.error_not_normalized(obj)
 				if error not in self.warnings:
 					self.warnings.add(error)
-					return False
+					#return False
 		else:
 			epsilon = 0.002
 			if total_weight > 1.0 + epsilon or total_weight < 1.0 - epsilon:
@@ -442,14 +442,14 @@ class RW4Exporter:
 
 		return vertices, triangles, indices_map
 
-	def create_vertex_description(self, use_texcoord: bool, use_bones: bool):
+	def create_vertex_description(self, use_texcoord: bool, use_bones: bool, use_tangent: bool):
 		"""
 		Creates the VertexDescription object used to define a certain vertex format.
 		The elements will be:
 		 - position
 		 - normal
 		 - texcoord0 (if use_texcoord)
-		 - tangent (if use_texcoord)
+		 - tangent (if use_texcoord && use_tangent)
 		 - blendIndices (if use_bones)
 		 - blendWeights (if use_bones)
 
@@ -485,17 +485,18 @@ class RW4Exporter:
 		offset += 4
 
 		if use_texcoord:
-			element = rw4_enums.VertexElement(
-				stream=0,
-				offset=offset,
-				element_type=rw4_enums.D3DDECLTYPE_UBYTE4,
-				method=rw4_enums.D3DDECLMETHOD_DEFAULT,
-				usage=rw4_enums.D3DDECLUSAGE_TANGENT,
-				usage_index=0,
-				rw_decl=rw4_enums.RWDECL_TANGENT
-			)
-			description.vertex_elements.append(element)
-			offset += 4
+			if use_tangent:
+				element = rw4_enums.VertexElement(
+					stream=0,
+					offset=offset,
+					element_type=rw4_enums.D3DDECLTYPE_UBYTE4,
+					method=rw4_enums.D3DDECLMETHOD_DEFAULT,
+					usage=rw4_enums.D3DDECLUSAGE_TANGENT,
+					usage_index=0,
+					rw_decl=rw4_enums.RWDECL_TANGENT
+				)
+				description.vertex_elements.append(element)
+				offset += 4
 
 			element = rw4_enums.VertexElement(
 				stream=0,
@@ -760,6 +761,7 @@ class RW4Exporter:
 
 		use_texcoord = blender_mesh.uv_layers.active is not None
 		use_bones = self.b_armature_object is not None
+		use_tangent = True; # TODO: Fruits should set this to false.
 
 		if not use_texcoord:
 			#TODO depending on the material? where did the "No material" go?
@@ -773,7 +775,7 @@ class RW4Exporter:
 		# For each object, create a vertex and index buffer
 
 		# When there is BlendShape, Spore does not add the bone indices to the vertex format, I don't know why
-		vertex_desc = self.create_vertex_description(use_texcoord, use_bones and not use_shape_keys)
+		vertex_desc = self.create_vertex_description(use_texcoord, use_bones and not use_shape_keys, use_tangent)
 
 		vertices, triangles, indices_map = self.process_mesh(
 			obj, blender_mesh, use_texcoord, use_bones, not use_shape_keys)
@@ -1347,7 +1349,51 @@ def can_export_object(obj):
 		# Do not export hidden meshes
 		if obj.hide_get(): 
 			return False
+
+	# Do not export objects that are only in disabled collections
+	if not object_in_enabled_collection(obj):
+		return False
+
 	return True
+
+
+def object_in_enabled_collection(obj):
+	"""Return True if the object belongs to at least one collection that is enabled
+	(not excluded/hidden) in the current view layer. If the object is in any such
+	collection, consider it exportable from a collection-visibility standpoint.
+	"""
+	try:
+		view_layer = bpy.context.view_layer
+		root_layer_coll = view_layer.layer_collection
+	except Exception:
+		# Fallback: assume visible
+		return True
+
+	def find_layer_collection(layer_coll, target_coll):
+		if layer_coll.collection == target_coll:
+			return layer_coll
+		for child in layer_coll.children:
+			found = find_layer_collection(child, target_coll)
+			if found:
+				return found
+		return None
+
+	# If object is not linked to any collection, treat as visible
+	if not obj.users_collection:
+		return True
+
+	for coll in obj.users_collection:
+		layer_coll = find_layer_collection(root_layer_coll, coll)
+		if layer_coll:
+			# layer_collection.exclude and layer_collection.hide_viewport indicate it's disabled in the view layer
+			if not getattr(layer_coll, 'exclude', False) and not getattr(layer_coll, 'hide_viewport', False) and not getattr(coll, 'hide_viewport', False):
+				return True
+		else:
+			# If the collection isn't present in the view layer hierarchy, fall back to the collection's own hide flag
+			if not getattr(coll, 'hide_viewport', False):
+				return True
+
+	return False
 
 def get_active_collection():
 	# Try selected collection
@@ -1651,6 +1697,16 @@ def export_rw4_symmetric(file, armatures, meshes, armature_actions, shape_keys_a
 				):
 					act = mirror_action(item, mirrored_arm)
 					mirrored_actions[act] = mirrored_arm
+
+	# Remove mirrored/related actions from ignored_actions so they are exported
+	# (shape-key actions are not copied, their original action objects are mapped
+	# in mirrored_shape_actions, so remove them from ignored_actions as well)
+	for a in list(mirrored_actions.keys()):
+		if a in ignored_actions:
+			ignored_actions.remove(a)
+	for a in list(mirrored_shape_actions.keys()):
+		if a in ignored_actions:
+			ignored_actions.remove(a)
 
 	# Start exporting
 	exporter_sym = RW4Exporter()
