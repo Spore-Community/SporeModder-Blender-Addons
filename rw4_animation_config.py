@@ -1,4 +1,5 @@
 import bpy
+from . import anim_compat
 
 from bpy.props import (BoolProperty,
 					   IntProperty,
@@ -8,9 +9,13 @@ from bpy.props import (BoolProperty,
 					   )
 import bpy
 import gpu
-import bgl
 from mathutils import Vector, Matrix
 from gpu_extras.batch import batch_for_shader
+
+# bgl was removed in Blender 4.0; only needed to set blend state on very old
+# builds that predate gpu.state.blend_set (< 2.91).
+if bpy.app.version < (2, 91):
+	import bgl
 
 DIRECTION_FACTORIES = {
 	'+X': lambda bbox: (bbox[1].x - bbox[0].x, 0.0, 0.0),
@@ -138,16 +143,16 @@ def get_default_handle_position(name):
 			current_actions.append(obj.data.shape_keys.animation_data.action)
 			obj.data.shape_keys.animation_data.action = None
 
-	is_shape_key = action.id_root == 'KEY'
+	is_shape_key = anim_compat.get_target_id_type(action) == 'KEY'
 	if not is_shape_key:
 		for obj in bpy.data.objects:
 			if obj.type == 'ARMATURE' and obj.animation_data is not None:
-				obj.animation_data.action = action
+				anim_compat.assign_action(obj, action, 'OBJECT')
 	else:
 		for obj in bpy.data.objects:
 			if obj.type == 'MESH' and obj.data.shape_keys is not None and \
 					obj.data.shape_keys.animation_data is not None:
-				obj.data.shape_keys.animation_data.action = action
+				anim_compat.assign_action(obj.data.shape_keys, action, 'KEY')
 
 	bpy.context.scene.frame_set(int(action.frame_range[0]))
 	bbox1 = calc_global_bbox()
@@ -165,9 +170,15 @@ def get_default_handle_position(name):
 	# Restore actions
 	for obj, act in zip(bpy.data.objects, current_actions):
 		if obj.type == 'ARMATURE' and obj.animation_data is not None:
-			obj.animation_data.action = act
+			if act is not None:
+				anim_compat.assign_action(obj, act, 'OBJECT')
+			else:
+				obj.animation_data.action = None
 		elif obj.type == 'MESH' and obj.data.shape_keys is not None and obj.data.shape_keys.animation_data is not None:
-			obj.data.shape_keys.animation_data.action = act
+			if act is not None:
+				anim_compat.assign_action(obj.data.shape_keys, act, 'KEY')
+			else:
+				obj.data.shape_keys.animation_data.action = None
 	bpy.context.scene.frame_set(current_keyframe)
 	return initial_pos, final_pos
 
@@ -224,10 +235,7 @@ class RW4AnimProperties(bpy.types.PropertyGroup):
 	def unregister(cls):
 		del bpy.types.Action.rw4
 
-if bpy.app.version[0] == 4:
-	shader = gpu.shader.from_builtin('UNIFORM_COLOR')
-else:
-	shader = gpu.shader.from_builtin('3D_UNIFORM_COLOR')
+shader = None
 BOX_COORDS = [
 		(-0.5, -0.5, +1), (+0.5, -0.5, +1),
 		(+0.5, +0.5, +1), (-0.5, +0.5, +1),
@@ -250,6 +258,11 @@ def is_anim_panel_showing():
 
 
 def handle_draw_callback():
+	global shader
+	if shader is None:
+		# The builtin shader was renamed '3D_UNIFORM_COLOR' -> 'UNIFORM_COLOR' in 3.4.
+		name = 'UNIFORM_COLOR' if bpy.app.version >= (3, 4) else '3D_UNIFORM_COLOR'
+		shader = gpu.shader.from_builtin(name)
 	if not bpy.data.actions:
 		return
 	action = bpy.data.actions[bpy.context.scene.rw4_list_index]
@@ -271,10 +284,13 @@ def handle_draw_callback():
 	matrix = Vector((0, 0, 1)).rotation_difference(direction).to_matrix()
 	matrix = Matrix.Translation(action.rw4.initial_pos) @ (matrix @ scale_matrix).to_4x4()
 
-	bgl.glEnable(bgl.GL_BLEND)
-	bgl.glEnable(bgl.GL_LINE_SMOOTH)
-	bgl.glEnable(bgl.GL_POLYGON_SMOOTH)
-	bgl.glBlendFunc(bgl.GL_SRC_ALPHA, bgl.GL_ONE_MINUS_SRC_ALPHA)
+	if bpy.app.version >= (2, 91):
+		gpu.state.blend_set('ALPHA')
+	else:
+		bgl.glEnable(bgl.GL_BLEND)
+		bgl.glEnable(bgl.GL_LINE_SMOOTH)
+		bgl.glEnable(bgl.GL_POLYGON_SMOOTH)
+		bgl.glBlendFunc(bgl.GL_SRC_ALPHA, bgl.GL_ONE_MINUS_SRC_ALPHA)
 
 	shader.bind()
 	shader.uniform_float("color", (109/255.0, 141/255.0, 143/255.0, 0.4))
@@ -321,7 +337,7 @@ class SPORE_UL_rw_anims(bpy.types.UIList):
 
 	def filter_items(self, context, data, propname):
 		items = getattr(data, propname)
-		new_items = sorted(filter(lambda x: x.fcurves, items), key=lambda x: x.name)
+		new_items = sorted(filter(lambda x: any(anim_compat.iter_fcurves(x)), items), key=lambda x: x.name)
 		filter_flags = [self.bitflag_filter_item if item in new_items else 0 for item in items]
 		filter_neworder = [new_items.index(item) if item in new_items else 0 for item in items]
 		return filter_flags, filter_neworder
@@ -397,9 +413,7 @@ class SPORE_OT_generate_morph_nudge(bpy.types.Operator):
 		current_frame = bpy.context.scene.frame_current
 
 		action = bpy.data.actions.new(name="Nudge")
-		if not armature_obj.animation_data:
-			armature_obj.animation_data_create()
-		armature_obj.animation_data.action = action
+		anim_compat.assign_action(armature_obj, action, 'OBJECT')
 
 		# Insert keyframes for root bone pose location
 		bpy.context.view_layer.objects.active = armature_obj
@@ -412,9 +426,9 @@ class SPORE_OT_generate_morph_nudge(bpy.types.Operator):
 
 		# Deselect all pose bones
 		for pb in armature_obj.pose.bones:
-			pb.bone.select = False
+			pb.select = False
 		# Select only the root bone
-		pose_bone.bone.select = True
+		pose_bone.select = True
 
 		# Frame 0: +Y
 		bpy.context.scene.frame_set(0)
@@ -427,7 +441,7 @@ class SPORE_OT_generate_morph_nudge(bpy.types.Operator):
 		bpy.ops.anim.keyframe_insert_menu(type='Location')
 
 		# Set interpolation to linear for all location keyframes of the root bone
-		action_fcurves = [fc for fc in action.fcurves if fc.data_path == f'pose.bones["{root_bone.name}"].location']
+		action_fcurves = [fc for fc in anim_compat.iter_fcurves(action) if fc.data_path == f'pose.bones["{root_bone.name}"].location']
 		for fc in action_fcurves:
 			for kp in fc.keyframe_points:
 				kp.interpolation = 'LINEAR'
@@ -493,10 +507,11 @@ def register():
 
 
 def unregister():
-	global _draw_handler
+	global _draw_handler, shader
 	if _draw_handler is not None:
 		bpy.types.SpaceView3D.draw_handler_remove(_draw_handler, 'WINDOW')
 		_draw_handler = None
+	shader = None
 
 	bpy.utils.unregister_class(SPORE_PT_rw_anims)
 	bpy.utils.unregister_class(RW4AnimProperties)
