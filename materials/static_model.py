@@ -7,10 +7,10 @@ import struct
 import bpy
 from bpy.props import (StringProperty,
 					   BoolProperty,
+					   EnumProperty,
 					   FloatProperty,
 					   PointerProperty
 					   )
-
 
 class StaticModel(RWMaterial):
 	material_name = "Static Model"
@@ -34,6 +34,14 @@ class StaticModel(RWMaterial):
 		subtype='FILE_PATH'
 	)
 
+	detail_texture: StringProperty(
+		name="Detail Texture",
+		description="The detail texture of this material, modulated over the diffuse texture"
+					" (leave empty if no texture desired)",
+		default="",
+		subtype='FILE_PATH'
+	)
+
 	material_params_1: FloatProperty(
 		name="Specular Exponent",
 		default=10
@@ -49,6 +57,32 @@ class StaticModel(RWMaterial):
 	)
 	material_params_4: FloatProperty(
 		name="Gloss",
+		default=0
+	)
+
+	#-- TINT OPTIONS -- #
+
+	tint_mode: EnumProperty(
+			name="Tint Mode",
+			items=[('DEFAULT', 'Default', "The material can apply vertex color"),
+				   ('TERRAIN', "Terrain", "The material can be tinted by the terrain color"),],
+			default='DEFAULT'
+		)
+
+	use_vertex_color: BoolProperty(
+		name="Use Vertex Color",
+		description="Use vertex color in the non-terrain tint path.",
+		default=1
+	)
+
+	tint_terrain: BoolProperty(
+		name="Terrain Surface Tint",
+		description="Tints the model based on terrain surface color, masked visible by the diffuse alpha value.",
+		default=0
+	)
+	tint_deadterrain: BoolProperty(
+		name="Terrain Cliff Tint",
+		description="Tints the model based on terrain cliff color, masked invisible by the diffuse alpha value.",
 		default=0
 	)
 
@@ -69,10 +103,18 @@ class StaticModel(RWMaterial):
 
 		layout.prop(data, 'diffuse_texture')
 		layout.prop(data, 'normal_texture')
+		layout.prop(data, 'detail_texture')
 		layout.prop(data, 'material_params_1')
 		layout.prop(data, 'material_params_2')
 		layout.prop(data, 'material_params_3')
 		layout.prop(data, 'material_params_4')
+		box = layout.box()
+		box.prop(data, 'tint_mode')
+		if data.tint_mode == 'TERRAIN':
+			box.prop(data, 'tint_terrain')
+			box.prop(data, 'tint_deadterrain')
+		else:
+			box.prop(data, 'use_vertex_color')
 
 	@staticmethod
 	def get_material_builder(exporter, rw4_material):
@@ -88,11 +130,14 @@ class StaticModel(RWMaterial):
 
 		if material.shader_id == 0x80000004:
 			material.FLAG3_RENDER_STATES = 0xc0000
+		
 		# -- SHADER CONSTANTS -- #
+
+		shaderdata0 = 0x26445C03 if (material_data.tint_deadterrain or material_data.tint_terrain) else 0x26445C02
 
 		material.add_shader_data(SHADER_DATA['materialParams'], struct.pack(
 			'<iffff',
-			0x26445C02,
+			shaderdata0,
 			material_data.material_params_1,
 			material_data.material_params_2,
 			material_data.material_params_3,
@@ -102,7 +147,15 @@ class StaticModel(RWMaterial):
 		# Maybe not necessary: this makes it use vertex color?
 		# add showIdentityPS -hasData identityColor 0x218 -exclude 0x200
 		# add restoreAlphaPS -hasData 0x218 -exclude 0x200
-		material.add_shader_data(0x218, struct.pack('<i', 0x028B7C00))
+		if material_data.tint_mode == 'TERRAIN':
+			material.FLAG3_RENDER_STATES |= 0xc0000
+			if material_data.tint_terrain:
+				material.add_shader_data(SHADER_DATA['terrainTint'], struct.pack('<i', 0x41200000))
+			if material_data.tint_deadterrain:
+				material.add_shader_data(SHADER_DATA['deadTerrainTint'], struct.pack('<i', 0x41200000))
+		else:
+			if material_data.use_vertex_color:
+				material.add_shader_data(0x218, struct.pack('<i', 0x028B7C00))
 
 		# -- RENDER STATES -- #
 		render_ware = exporter.render_ware
@@ -137,6 +190,13 @@ class StaticModel(RWMaterial):
 			texture_raster=exporter.add_texture(material_data.normal_texture),
 			disable_stage_op=True
 		))
+		
+		if material_data.detail_texture != "":
+			material.texture_slots.append(RWTextureSlot(
+				sampler_index=2,
+				texture_raster=exporter.add_texture(material_data.detail_texture),
+				disable_texture_states=True
+			))
 
 		return material
 
@@ -161,6 +221,23 @@ class StaticModel(RWMaterial):
 			material_data.material_params_2 = values[2]
 			material_data.material_params_3 = values[3]
 			material_data.material_params_4 = values[4]
+
+		# Reconstruct flag bools from shader data
+
+		terrain_tint = material.get_shader_data(SHADER_DATA['terrainTint'])
+		dead_terrain_tint = material.get_shader_data(SHADER_DATA['deadTerrainTint'])
+		vertex_color = material.get_shader_data(0x218)
+
+		material_data.tint_terrain = terrain_tint is not None
+		material_data.tint_deadterrain = dead_terrain_tint is not None
+		material_data.use_vertex_color = False
+
+		if material_data.tint_terrain or material_data.tint_deadterrain:
+			material_data.tint_mode = 'TERRAIN'
+		else:
+			material_data.tint_mode = 'DEFAULT'
+			if vertex_color is not None and len(vertex_color.data) == struct.calcsize('<i'):
+				material_data.use_vertex_color = struct.unpack('<i', vertex_color.data)[0] == 0x028B7C00
 
 		return True
 
