@@ -644,10 +644,8 @@ class RW4Importer:
 			anim_compat.assign_action(self.b_armature_object, b_action, 'OBJECT')
 			channelbag = anim_compat.channelbag_for(b_action, 'OBJECT')
 
-			bpy.ops.object.mode_set(mode='POSE')
 			bpy.context.scene.frame_set(0)
-			for bone in self.b_armature_object.pose.bones:
-				bone.select = True
+			bpy.ops.pose.select_all(action='SELECT')
 			bpy.ops.pose.transforms_clear()
 
 			channel_keyframes = self.process_animation(animation)

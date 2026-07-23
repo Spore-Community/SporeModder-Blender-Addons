@@ -175,14 +175,14 @@ class ExportRW4(bpy.types.Operator, ExportHelper):
 	# Export a mirrored copy of the mesh
 	export_symmetric: bpy.props.BoolProperty(
 		name="Export Symmetric Variant",
-		description="Export an additional mirrored mesh with -symmetric suffix",
+		description="Export an additional mirrored mesh with -symmetric suffix in addition to the original mesh",
 		default=False
 	)
 
 	# Export with morphs omitted
-	export_as_lod1: bpy.props.BoolProperty(
-		name="Export as LOD1",
-		description="Export selected models with morphs omitted, for LOD1 usage",
+	export_for_runtime: bpy.props.BoolProperty(
+		name="Export for Runtime",
+		description="Export selected part models with morphs omitted, for runtime usage (editor_runtimeRigblock~)",
 		default=False
 	)
 
@@ -196,12 +196,12 @@ class ExportRW4(bpy.types.Operator, ExportHelper):
 
 		with open(self.filepath, 'bw') as file:
 			mod_paths.set_export_path(self.filepath)
-			return export_rw4(file, self.export_symmetric, self.export_as_lod1)
+			return export_rw4(file, self.export_symmetric, self.export_for_runtime)
 
 	def draw(self, context):
 		layout = self.layout
 		layout.prop(self, "export_symmetric")
-		layout.prop(self, "export_as_lod1")
+		layout.prop(self, "export_for_runtime")
 
 """
 class ImportAnim(bpy.types.Operator, ImportHelper):
@@ -251,7 +251,7 @@ class ExportAnim(bpy.types.Operator, ExportHelper):
 class ImportMuscle(bpy.types.Operator, ImportHelper):
 	bl_idname = "import_my_format.muscle"
 	bl_label = "Import Limb Muscle (.prop.prop_t)"
-	bl_description = "Import a muscle file (or muscle group) as Blender curves"
+	bl_description = "Import a complete muscle file (or individual muscle group) as Blender curves. (Muscle files can contain multiple muscle groups)"
 
 	filename_ext = ".prop.prop_t"
 	filter_glob: bpy.props.StringProperty(default="*.prop.prop_t", options={'HIDDEN'})

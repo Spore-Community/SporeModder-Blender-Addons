@@ -89,3 +89,17 @@ def iter_fcurves(action):
     else:
         for fc in action.fcurves:
             yield fc
+
+def pose_bone_select(pose_bone, select=True):
+	"""Select/deselect a pose bone in 5.0+ or legacy."""
+	if bpy.app.version[0] >= 5:
+		pose_bone.select = select
+	else:
+		pose_bone.bone.select = select
+
+def is_pose_bone_selected(pose_bone):
+	"""Check if a pose bone is selected in 5.0+ or legacy."""
+	if bpy.app.version[0] >= 5:
+		return pose_bone.select
+	else:
+		return pose_bone.bone.select

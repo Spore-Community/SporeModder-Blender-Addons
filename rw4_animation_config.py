@@ -115,6 +115,7 @@ DEFAULT_HANDLE_POSITIONS = {
 	'DeformAxisRight': (default_deform_axis, ['+X']),
 	'DeformAxisLeft': (default_deform_axis, ['-X']),
 	'DeformAxisUp': (default_deform_axis, ['+Z']),
+	'DeformAxisUpB': (default_deform_axis, ['+Z']),
 	'DeformAxisDown': (default_deform_axis, ['-Z']),
 	'DeformBoneBaseJoint': (default_deform_axis, ['+Z']),
 	'DeformBoneEndJoint': (default_deform_axis, ['+Z']),
@@ -426,9 +427,9 @@ class SPORE_OT_generate_morph_nudge(bpy.types.Operator):
 
 		# Deselect all pose bones
 		for pb in armature_obj.pose.bones:
-			pb.select = False
+			anim_compat.pose_bone_select(pb, select=False)
 		# Select only the root bone
-		pose_bone.select = True
+		anim_compat.pose_bone_select(pose_bone, select=True)
 
 		# Frame 0: +Y
 		bpy.context.scene.frame_set(0)
