@@ -14,6 +14,7 @@ class ZZModAPIShaderMaterial(RWMaterial):
 	material_description = "A base material for using custom shaders."
 	material_has_material_color = True
 	material_has_ambient_color = False
+	material_use_alpha = True
 
 	shader_name: StringProperty(
 		name="Shader Name",
@@ -85,7 +86,7 @@ class ZZModAPIShaderMaterial(RWMaterial):
 
 		# -- RENDER STATES -- #
 
-		material.set_render_states('ALPHA')
+		material.set_render_states(rw4_material.alpha_type)
 
 		# -- SHADER CONSTANTS -- #
 		# Add here any shader constants related with your shaders

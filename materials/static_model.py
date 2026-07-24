@@ -196,7 +196,8 @@ class StaticModel(RWMaterial):
 				sampler_index=2,
 				texture_raster=exporter.add_texture(material_data.detail_texture),
 				disable_texture_states=True
-			))
+			)
+		)
 
 		return material
 
@@ -243,10 +244,9 @@ class StaticModel(RWMaterial):
 
 	@staticmethod
 	def set_texture(obj, material, slot_index, path):
+		image = bpy.data.images.load(path)
 		if slot_index == 0:
 			material.rw4.material_data_StaticModel.diffuse_texture = path
-
-			image = bpy.data.images.load(path)
 
 			texture_node = material.node_tree.nodes.new("ShaderNodeTexImage")
 			texture_node.image = image
@@ -255,10 +255,9 @@ class StaticModel(RWMaterial):
 			material.node_tree.links.new(material.node_tree.nodes["Principled BSDF"].inputs["Base Color"],
 										 texture_node.outputs["Color"])
 
-		else:
+		elif slot_index == 1:
 			material.rw4.material_data_StaticModel.normal_texture = path
 
-			image = bpy.data.images.load(path)
 			image.colorspace_settings.name = 'Non-Color'
 
 			texture_node = material.node_tree.nodes.new("ShaderNodeTexImage")
@@ -278,3 +277,7 @@ class StaticModel(RWMaterial):
 			specular_input = "Specular IOR Level" if bpy.app.version >= (4, 0) else "Specular"
 			material.node_tree.links.new(material.node_tree.nodes["Principled BSDF"].inputs[specular_input],
 										 texture_node.outputs["Alpha"])
+		
+		else:
+			material.rw4.material_data_StaticModel.detail_texture = path
+			# TODO: add into shader tree

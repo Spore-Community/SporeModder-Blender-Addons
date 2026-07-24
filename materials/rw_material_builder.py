@@ -9,32 +9,35 @@ from ..file_io import ArrayFileWriter, FileReader
 
 class RWTextureSlot:
 	"""
-	This class represents one texture slot of a material. The slot has a slot inedx, a reference to the
+	This class represents one texture slot of a material. The slot has a slot index, a reference to the
 	texture, and sampler/stage states.
 	"""
-	def __init__(self, sampler_index=0, texture_raster=None, set_default_states=True, disable_stage_op=False):
+	def __init__(self, sampler_index=0, texture_raster=None, set_default_states=True, disable_stage_op=False,
+			  disable_texture_states=False, disable_sampler_states=False):
 		self.texture_stage_states = OrderedDict()
 		self.sampler_states = OrderedDict()
 		self.texture_raster = texture_raster
 		self.sampler_index = sampler_index
 
 		if set_default_states:
-			if texture_raster is not None and not disable_stage_op:
-				self.texture_stage_states[rw4_enums.D3DTSS_COLOROP] = rw4_enums.D3DTOP_MODULATE
-				self.texture_stage_states[rw4_enums.D3DTSS_COLORARG1] = rw4_enums.D3DTA_TEXTURE
-				self.texture_stage_states[rw4_enums.D3DTSS_COLORARG2] = rw4_enums.D3DTA_DIFFUSE
-				self.texture_stage_states[rw4_enums.D3DTSS_ALPHAOP] = rw4_enums.D3DTOP_MODULATE
-				self.texture_stage_states[rw4_enums.D3DTSS_ALPHAARG1] = rw4_enums.D3DTA_TEXTURE
-				self.texture_stage_states[rw4_enums.D3DTSS_ALPHAARG2] = rw4_enums.D3DTA_DIFFUSE
-			else:
-				self.texture_stage_states[rw4_enums.D3DTSS_COLOROP] = rw4_enums.D3DTOP_DISABLE
-				self.texture_stage_states[rw4_enums.D3DTSS_ALPHAOP] = rw4_enums.D3DTOP_DISABLE
+			if not disable_texture_states:
+				if texture_raster is not None and not disable_stage_op:
+					self.texture_stage_states[rw4_enums.D3DTSS_COLOROP] = rw4_enums.D3DTOP_MODULATE
+					self.texture_stage_states[rw4_enums.D3DTSS_COLORARG1] = rw4_enums.D3DTA_TEXTURE
+					self.texture_stage_states[rw4_enums.D3DTSS_COLORARG2] = rw4_enums.D3DTA_DIFFUSE
+					self.texture_stage_states[rw4_enums.D3DTSS_ALPHAOP] = rw4_enums.D3DTOP_MODULATE
+					self.texture_stage_states[rw4_enums.D3DTSS_ALPHAARG1] = rw4_enums.D3DTA_TEXTURE
+					self.texture_stage_states[rw4_enums.D3DTSS_ALPHAARG2] = rw4_enums.D3DTA_DIFFUSE
+				else:
+					self.texture_stage_states[rw4_enums.D3DTSS_COLOROP] = rw4_enums.D3DTOP_DISABLE
+					self.texture_stage_states[rw4_enums.D3DTSS_ALPHAOP] = rw4_enums.D3DTOP_DISABLE
 
-			self.sampler_states[rw4_enums.D3DSAMP_ADDRESSU] = rw4_enums.D3DTADDRESS_WRAP
-			self.sampler_states[rw4_enums.D3DSAMP_ADDRESSV] = rw4_enums.D3DTADDRESS_WRAP
-			self.sampler_states[rw4_enums.D3DSAMP_MAGFILTER] = rw4_enums.D3DTEXF_LINEAR
-			self.sampler_states[rw4_enums.D3DSAMP_MINFILTER] = rw4_enums.D3DTEXF_LINEAR
-			self.sampler_states[rw4_enums.D3DSAMP_MIPFILTER] = rw4_enums.D3DTEXF_POINT
+			if not disable_sampler_states:
+				self.sampler_states[rw4_enums.D3DSAMP_ADDRESSU] = rw4_enums.D3DTADDRESS_WRAP
+				self.sampler_states[rw4_enums.D3DSAMP_ADDRESSV] = rw4_enums.D3DTADDRESS_WRAP
+				self.sampler_states[rw4_enums.D3DSAMP_MAGFILTER] = rw4_enums.D3DTEXF_LINEAR
+				self.sampler_states[rw4_enums.D3DSAMP_MINFILTER] = rw4_enums.D3DTEXF_LINEAR
+				self.sampler_states[rw4_enums.D3DSAMP_MIPFILTER] = rw4_enums.D3DTEXF_POINT
 
 
 ShaderData = namedtuple('ShaderData', ('index', 'offset', 'data'))
@@ -124,6 +127,85 @@ SHADER_DATA = {
 	'ModAPIShader': 0x3FF
 }
 
+alpha_modes = {
+
+	"NO_ALPHA": {
+		rw4_enums.D3DRS_ZWRITEENABLE : 1,
+		rw4_enums.D3DRS_ALPHATESTENABLE : 0,
+		rw4_enums.D3DRS_CULLMODE : rw4_enums.D3DCULL_CW,
+		rw4_enums.D3DRS_ZFUNC : rw4_enums.D3DCMP_LESSEQUAL,
+		rw4_enums.D3DRS_ALPHABLENDENABLE : 0,
+	},
+	"NO_ALPHA-1": {
+		rw4_enums.D3DRS_ZWRITEENABLE : 1,
+		rw4_enums.D3DRS_ALPHATESTENABLE : 1,
+		rw4_enums.D3DRS_CULLMODE : rw4_enums.D3DCULL_CW,
+		rw4_enums.D3DRS_ZFUNC : rw4_enums.D3DCMP_LESSEQUAL,
+		rw4_enums.D3DRS_ALPHABLENDENABLE : 0,
+	},
+	"NO_ALPHA-2": {
+		rw4_enums.D3DRS_ZWRITEENABLE : 1,
+		rw4_enums.D3DRS_ALPHATESTENABLE : 1,
+		rw4_enums.D3DRS_CULLMODE : rw4_enums.D3DCULL_CW,
+		rw4_enums.D3DRS_ZFUNC : rw4_enums.D3DCMP_LESSEQUAL,
+		rw4_enums.D3DRS_ALPHAREF : 0,
+		rw4_enums.D3DRS_ALPHAFUNC : rw4_enums.D3DCMP_GREATER,
+		rw4_enums.D3DRS_ALPHABLENDENABLE : 0,
+	},
+	"ALPHA": {
+		rw4_enums.D3DRS_ZWRITEENABLE : 1,
+		rw4_enums.D3DRS_ALPHATESTENABLE : 1,
+		rw4_enums.D3DRS_SRCBLEND : rw4_enums.D3DBLEND_SRCALPHA,
+		rw4_enums.D3DRS_DESTBLEND : rw4_enums.D3DBLEND_INVSRCALPHA,
+		rw4_enums.D3DRS_CULLMODE : rw4_enums.D3DCULL_CW,
+		rw4_enums.D3DRS_ZFUNC : rw4_enums.D3DCMP_LESSEQUAL,
+		rw4_enums.D3DRS_ALPHAREF : 0,
+		rw4_enums.D3DRS_ALPHAFUNC : rw4_enums.D3DCMP_GREATER,
+		rw4_enums.D3DRS_ALPHABLENDENABLE : 1,
+	},
+	"EXCLUDING_ALPHA": {
+		rw4_enums.D3DRS_ZWRITEENABLE : 1,
+		rw4_enums.D3DRS_ALPHATESTENABLE : 1,
+		rw4_enums.D3DRS_SRCBLEND : rw4_enums.D3DBLEND_SRCALPHA,
+		rw4_enums.D3DRS_DESTBLEND : rw4_enums.D3DBLEND_INVSRCALPHA,
+		rw4_enums.D3DRS_CULLMODE : rw4_enums.D3DCULL_CW,
+		rw4_enums.D3DRS_ZFUNC : rw4_enums.D3DCMP_LESSEQUAL,
+		rw4_enums.D3DRS_ALPHAREF : 127,
+		rw4_enums.D3DRS_ALPHAFUNC : rw4_enums.D3DCMP_GREATER,
+		rw4_enums.D3DRS_ALPHABLENDENABLE : 0,
+	},
+	"WINDOW_ALPHA": {
+		rw4_enums.D3DRS_ZWRITEENABLE : 1,
+		rw4_enums.D3DRS_ALPHATESTENABLE : 0,
+		rw4_enums.D3DRS_SRCBLEND : rw4_enums.D3DBLEND_SRCALPHA,
+		rw4_enums.D3DRS_DESTBLEND : rw4_enums.D3DBLEND_INVSRCALPHA,
+		rw4_enums.D3DRS_CULLMODE : rw4_enums.D3DCULL_CW,
+		rw4_enums.D3DRS_ZFUNC : rw4_enums.D3DCMP_LESSEQUAL,
+		rw4_enums.D3DRS_ALPHABLENDENABLE : 1,
+	},
+	"PLANT_FRUIT": {
+		rw4_enums.D3DRS_ZWRITEENABLE : 1,
+		rw4_enums.D3DRS_ALPHATESTENABLE : 0,
+		rw4_enums.D3DRS_SRCBLEND : rw4_enums.D3DBLEND_SRCALPHA,
+		rw4_enums.D3DRS_DESTBLEND : rw4_enums.D3DBLEND_INVSRCALPHA,
+		rw4_enums.D3DRS_CULLMODE : rw4_enums.D3DCULL_CW,
+		rw4_enums.D3DRS_ZFUNC : rw4_enums.D3DCMP_LESSEQUAL,
+	},
+	#"EDITOR_BACKGROUND": {
+	#	rw4_enums.D3DRS_ZWRITEENABLE : 1,
+	#	rw4_enums.D3DRS_ALPHATESTENABLE : 0,
+	#	rw4_enums.D3DRS_SRCBLEND : rw4_enums.D3DBLEND_SRCALPHA,
+	#	rw4_enums.D3DRS_DESTBLEND : rw4_enums.D3DBLEND_INVSRCALPHA,
+	#	rw4_enums.D3DRS_CULLMODE : rw4_enums.D3DCULL_CW,
+	#	rw4_enums.D3DRS_ZFUNC : rw4_enums.D3DCMP_LESSEQUAL,
+	#	rw4_enums.D3DRS_ALPHABLENDENABLE : 0,
+	#	rw4_enums.D3DRS_FOGENABLE : 0,
+	#	rw4_enums.D3DRS_TEXTUREFACTOR : (1, 1, 1, -0.00392156862745098),
+	#	rw4_enums.D3DRS_LIGHTING : 0,
+	#	rw4_enums.D3DRS_COLORWRITEENABLE : 15,
+	#}
+
+}
 
 class RWMaterialBuilder:
 	"""
@@ -138,6 +220,7 @@ class RWMaterialBuilder:
 
 	FLAG3_RENDER_STATES = 0x20000
 	FLAG3_TEXTURE_SLOTS = 0x1FFFF
+	FLAG3_UNK1 = 0xC0000
 
 	def __init__(self):
 		self.material_color = None
@@ -150,6 +233,10 @@ class RWMaterialBuilder:
 		self.primitive_type = 4
 		# 17 booleans. If you don't want to use it, directly assign it to None
 		self.unknown_booleans = []
+		
+		self.flags1 = 0
+		self.flags2 = 0
+		self.flags3 = 0
 
 	def get_shader_data(self, index):
 		for sh_data in self.shader_data:
@@ -170,13 +257,9 @@ class RWMaterialBuilder:
 
 	def write(self, render_ware, stream):
 
-		flags1 = 0
-		flags2 = 0
-		flags3 = 0
-
-		# always used? don't really know what it does
-		flags1 |= 4
-		flags2 |= 0x8000
+		flags1 = self.flags1
+		flags2 = self.flags2
+		flags3 = self.flags3
 
 		# always used? don't really know what it does
 		flags1 |= 4
@@ -210,7 +293,7 @@ class RWMaterialBuilder:
 								  flags1,
 								  flags2,
 								  flags3,
-								  0,  # field_14, also sued as flags
+								  0,  # field_14, also ussed as flags
 								  self.shader_id,
 								  0  # just padding
 								  ))
@@ -254,6 +337,8 @@ class RWMaterialBuilder:
 				else:
 					stream.extend(struct.pack('<?', self.unknown_booleans[i]))
 
+		# Write render states
+		# TODO: implement 'statesGroup's
 		if len(self.render_states) > 0:
 			stream.extend(struct.pack('<I', 0))
 
@@ -262,6 +347,7 @@ class RWMaterialBuilder:
 
 			stream.extend(struct.pack('<ii', -1, -1))
 
+		# Write texture slots
 		if len(self.texture_slots) > 0:
 			stream.extend(struct.pack('<i', -1))
 
@@ -412,75 +498,40 @@ class RWMaterialBuilder:
 	def set_render_states(self, alpha_mode='NO_ALPHA'):
 		"""
 		Assigns predefined sets of render states, depending on the alpha mode.
-		:param alpha_mode: Possible options are 'NO_ALPHA', 'ALPHA', 'EXCLUDING_ALPHA', 'WINDOW_ALPHA'
+		:param alpha_mode: Possible options are listed in alpha_modes
 		"""
 
-		if alpha_mode == 'NO_ALPHA':
-			self.render_states[rw4_enums.D3DRS_ZWRITEENABLE] = 1
-			self.render_states[rw4_enums.D3DRS_ALPHATESTENABLE] = 0
-			self.render_states[rw4_enums.D3DRS_CULLMODE] = rw4_enums.D3DCULL_CW
-			self.render_states[rw4_enums.D3DRS_ZFUNC] = rw4_enums.D3DCMP_LESSEQUAL
-			self.render_states[rw4_enums.D3DRS_ALPHABLENDENABLE] = 0
+		if alpha_mode in alpha_modes:
+			for state, value in alpha_modes[alpha_mode].items():
+				self.set_render_state(state, value)
 
-		elif alpha_mode == 'ALPHA':
-			self.render_states[rw4_enums.D3DRS_ZWRITEENABLE] = 1
-			self.render_states[rw4_enums.D3DRS_ALPHATESTENABLE] = 1
-			self.render_states[rw4_enums.D3DRS_SRCBLEND] = rw4_enums.D3DBLEND_SRCALPHA
-			self.render_states[rw4_enums.D3DRS_DESTBLEND] = rw4_enums.D3DBLEND_INVSRCALPHA
-			self.render_states[rw4_enums.D3DRS_CULLMODE] = rw4_enums.D3DCULL_CW
-			self.render_states[rw4_enums.D3DRS_ZFUNC] = rw4_enums.D3DCMP_LESSEQUAL
-			self.render_states[rw4_enums.D3DRS_ALPHAREF] = 0
-			self.render_states[rw4_enums.D3DRS_ALPHAFUNC] = rw4_enums.D3DCMP_GREATER
-			self.render_states[rw4_enums.D3DRS_ALPHABLENDENABLE] = 1
-
-		elif alpha_mode == 'EXCLUDING_ALPHA':
-			self.render_states[rw4_enums.D3DRS_ZWRITEENABLE] = 1
-			self.render_states[rw4_enums.D3DRS_ALPHATESTENABLE] = 1
-			self.render_states[rw4_enums.D3DRS_CULLMODE] = rw4_enums.D3DCULL_CW
-			self.render_states[rw4_enums.D3DRS_ZFUNC] = rw4_enums.D3DCMP_LESSEQUAL
-			self.render_states[rw4_enums.D3DRS_ALPHAREF] = 127
-			self.render_states[rw4_enums.D3DRS_ALPHAFUNC] = rw4_enums.D3DCMP_GREATER
-			self.render_states[rw4_enums.D3DRS_ALPHABLENDENABLE] = 0
-			self.render_states[rw4_enums.D3DRS_FOGENABLE] = 0
-		
-		elif alpha_mode == 'WINDOW_ALPHA':
-			self.render_states[rw4_enums.D3DRS_ZWRITEENABLE] = 1
-			self.render_states[rw4_enums.D3DRS_ALPHATESTENABLE] = 0
-			self.render_states[rw4_enums.D3DRS_SRCBLEND] = rw4_enums.D3DBLEND_SRCALPHA
-			self.render_states[rw4_enums.D3DRS_DESTBLEND] = rw4_enums.D3DBLEND_INVSRCALPHA
-			self.render_states[rw4_enums.D3DRS_CULLMODE] = rw4_enums.D3DCULL_CW
-			self.render_states[rw4_enums.D3DRS_ZFUNC] = rw4_enums.D3DCMP_LESSEQUAL
-			self.render_states[rw4_enums.D3DRS_ALPHABLENDENABLE] = 1
-
-		elif alpha_mode == 'EDITOR_BACKGROUND':
-			self.render_states[rw4_enums.D3DRS_ZWRITEENABLE] = 1
-			self.render_states[rw4_enums.D3DRS_ALPHATESTENABLE] = 0
-			self.render_states[rw4_enums.D3DRS_CULLMODE] = rw4_enums.D3DCULL_CW
-			self.render_states[rw4_enums.D3DRS_ZFUNC] = rw4_enums.D3DCMP_LESSEQUAL
-			self.render_states[rw4_enums.D3DRS_ALPHABLENDENABLE] = 0
-			self.render_states[rw4_enums.D3DRS_FOGENABLE] = 0
-			# TODO: implement statesGroup
-			self.render_states[rw4_enums.D3DRS_TEXTUREFACTOR] = (1, 1, 1, -0.00392156862745098)
-			self.render_states[rw4_enums.D3DRS_LIGHTING] = 0
-			self.render_states[rw4_enums.D3DRS_COLORWRITEENABLE] = 15
+		elif alpha_mode == 'CUSTOM':
+			pass
 
 		else:
 			raise NameError("Unsupported render states %s" % alpha_mode)
 
+
 	def detect_render_states(self):
 		"""
-		Returns the detected alpha mode ('NO_ALPHA', 'ALPHA', 'EXCLUDING', WINDOW_ALPHA) depending on the render states of this
-		material. Returns None if it cannot be detected.
+		Returns the detected alpha_mode entry depending on the render states of this
+		material. Returns CUSTOM if it cannot be detected.
 		"""
-		if rw4_enums.D3DRS_ALPHATESTENABLE not in self.render_states:
-			return None
-		if self.render_states[rw4_enums.D3DRS_ALPHATESTENABLE] == 0:
-			#if rw4_enums.D3DRS_ALPHABLENDENABLE not in self.render_states or self.render_states[rw4_enums.D3DRS_ALPHABLENDENABLE] == 0:
-				return 'NO_ALPHA'
-			#else:
-			#	return 'WINDOW_ALPHA'
-		else:
-			if rw4_enums.D3DRS_ALPHAREF not in self.render_states or self.render_states[rw4_enums.D3DRS_ALPHAREF] == 0:
-				return 'ALPHA'
-			else:
-				return 'EXCLUDING_ALPHA'
+
+		print(self.render_states)
+		# If we found a matching alpha mode, return it
+		for alpha_mode, states in alpha_modes.items():
+			print(alpha_mode, states)
+			if all(state in states and states[state] == value for state, value in self.render_states.items()):
+				return alpha_mode.split('-')[0]
+		
+		return 'CUSTOM'
+
+	def set_render_state(self, render_state, value):
+		"""
+		Sets a render state in the render states dictionary
+		:param render_state: The render state to set
+		:param value: The value to set. If None, the state will be removed.
+		"""
+		#if value > 0:
+		self.render_states[render_state] = value
