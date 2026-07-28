@@ -559,6 +559,17 @@ class RW4Importer:
 				fcurve.group = b_action_group
 				fcurves_vs.append(fcurve)
 
+		# Start every imported channel with a default frame 0
+		has_frame0 = any(kf.time == 0.0 for kf in channel.keyframes)
+		if import_locrot and not has_frame0:
+			for i in range(4):
+				fcurves_qr[i].keyframe_points.insert(0, 1.0 if i == 0 else 0.0)
+			for i in range(3):
+				fcurves_vt[i].keyframe_points.insert(0, 0.0)
+			if import_scale:
+				for i in range(3):
+					fcurves_vs[i].keyframe_points.insert(0, 1.0)
+
 		prev_qr = None
 		for k, kf in enumerate(channel.keyframes):
 			time = int(round(kf.time * rw4_base.KeyframeAnim.FPS))

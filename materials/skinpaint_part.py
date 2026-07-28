@@ -51,7 +51,7 @@ class SkinPaintPart(RWMaterial):
 
 		material.shader_id = 0x80000005 if exporter.is_blend_shape() else 0x80000004
 		material.unknown_booleans.append(True)  # the rest are going to be False
-		material.flags3 |= 0xc0000
+		#material.flags3 |= 0xc0000
 
 		# -- RENDER STATES -- #
 

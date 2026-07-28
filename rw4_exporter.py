@@ -168,6 +168,22 @@ class RW4Exporter:
 		self.blend_shape = None
 		self.export_for_runtime = False
 
+	@staticmethod
+	def _set_nla_track_mutes(animation_data, mute):
+		if animation_data is None or not animation_data.nla_tracks:
+			return None
+		previous_states = [track.mute for track in animation_data.nla_tracks]
+		for track in animation_data.nla_tracks:
+			track.mute = mute
+		return previous_states
+
+	@staticmethod
+	def _restore_nla_track_mutes(animation_data, previous_states):
+		if animation_data is None or previous_states is None:
+			return
+		for track, state in zip(animation_data.nla_tracks, previous_states):
+			track.mute = state
+
 	def has_skeleton(self):
 		"""
 		:return: True if this models uses a skeleton, False otherwise.
@@ -1221,7 +1237,11 @@ class RW4Exporter:
 				self.process_blend_shape_action(action, keyframe_anim)
 			else:
 				anim_compat.assign_action(self.b_armature_object, action, 'OBJECT')
-				self.process_skeleton_action(action, keyframe_anim)
+				previous_mutes = self._set_nla_track_mutes(self.b_armature_object.animation_data, True)
+				try:
+					self.process_skeleton_action(action, keyframe_anim)
+				finally:
+					self._restore_nla_track_mutes(self.b_armature_object.animation_data, previous_mutes)
 
 			# Remove trailing numbers from action name
 			action_name = action.name.split('.')[0]

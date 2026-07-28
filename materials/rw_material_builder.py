@@ -186,6 +186,10 @@ alpha_modes = {
 		rw4_enums.D3DRS_ALPHAFUNC : rw4_enums.D3DCMP_GREATER,
 		rw4_enums.D3DRS_ALPHABLENDENABLE : 0,
 	},
+
+}
+
+alpha_modes_2 = {
 	"WINDOW_ALPHA": {
 		rw4_enums.D3DRS_ZWRITEENABLE : 1,
 		rw4_enums.D3DRS_ALPHATESTENABLE : 0,
@@ -216,7 +220,6 @@ alpha_modes = {
 	#	rw4_enums.D3DRS_LIGHTING : 0,
 	#	rw4_enums.D3DRS_COLORWRITEENABLE : 15,
 	#}
-
 }
 
 class RWMaterialBuilder:
@@ -248,7 +251,7 @@ class RWMaterialBuilder:
 		
 		self.flags1 = 0
 		self.flags2 = 0
-		self.flags3 = 0
+		self.flags3 = 0xC0000
 
 	def get_shader_data(self, index):
 		for sh_data in self.shader_data:
@@ -515,6 +518,10 @@ class RWMaterialBuilder:
 
 		if alpha_mode in alpha_modes:
 			for state, value in alpha_modes[alpha_mode].items():
+				self.set_render_state(state, value)
+		
+		elif alpha_mode in alpha_modes_2:
+			for state, value in alpha_modes_2[alpha_mode].items():
 				self.set_render_state(state, value)
 
 		elif alpha_mode == 'CUSTOM':

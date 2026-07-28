@@ -135,7 +135,7 @@ class StaticModel(RWMaterial):
 		# TODO: this also appears on some STATIC shader objects...
 		# What are its conditions?
 		#if material.shader_id == SHADER_SKELETON:
-		material.flags3 |= 0xc0000
+		#material.flags3 |= 0xc0000
 		
 		# -- SHADER CONSTANTS -- #
 
@@ -154,7 +154,6 @@ class StaticModel(RWMaterial):
 		# add showIdentityPS -hasData identityColor 0x218 -exclude 0x200
 		# add restoreAlphaPS -hasData 0x218 -exclude 0x200
 		if material_data.tint_mode == 'TERRAIN':
-			material.flags3 |= 0xc0000
 			if material_data.tint_terrain:
 				material.add_shader_data(SHADER_DATA['terrainTint'], struct.pack('<i', 0x41200000))
 			if material_data.tint_deadterrain:
