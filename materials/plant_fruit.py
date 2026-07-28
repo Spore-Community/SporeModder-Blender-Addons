@@ -80,7 +80,7 @@ class PlantFruit(RWMaterial):
 		if material.shader_id != 0x4000000E and material.shader_id != 0x4000000C and material.shader_id != 0x4000000D:
 			return False
 
-		# sh_data = material.get_shader_data(0x218)
+		# sh_data = material.get_shader_data(SHADER_DATA['vertexColor'])
 		# if sh_data is None or sh_data.data is None or len(sh_data.data) != 4:
 		#     return False
 

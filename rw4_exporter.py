@@ -444,7 +444,7 @@ class RW4Exporter:
 
 		return vertices, triangles, indices_map
 
-	def create_vertex_description(self, use_texcoord: bool, use_bones: bool, use_tangent: bool):
+	def create_vertex_description(self, use_texcoord: bool, use_bones: bool, use_tangent: bool, float_normals: bool = False):
 		"""
 		Creates the VertexDescription object used to define a certain vertex format.
 		The elements will be:
@@ -462,6 +462,10 @@ class RW4Exporter:
 		description = rw4_base.VertexDescription(self.render_ware)
 		offset = 0
 
+		normal_element = rw4_enums.D3DDECLTYPE_UBYTE4
+		if float_normals:
+			normal_element = rw4_enums.D3DDECLTYPE_FLOAT3
+
 		element = rw4_enums.VertexElement(
 			stream=0,
 			offset=offset,
@@ -477,7 +481,7 @@ class RW4Exporter:
 		element = rw4_enums.VertexElement(
 			stream=0,
 			offset=offset,
-			element_type=rw4_enums.D3DDECLTYPE_UBYTE4,
+			element_type=normal_element,
 			method=rw4_enums.D3DDECLMETHOD_DEFAULT,
 			usage=rw4_enums.D3DDECLUSAGE_NORMAL,
 			usage_index=0,
@@ -491,7 +495,7 @@ class RW4Exporter:
 				element = rw4_enums.VertexElement(
 					stream=0,
 					offset=offset,
-					element_type=rw4_enums.D3DDECLTYPE_UBYTE4,
+					element_type=normal_element,
 					method=rw4_enums.D3DDECLMETHOD_DEFAULT,
 					usage=rw4_enums.D3DDECLUSAGE_TANGENT,
 					usage_index=0,
@@ -780,7 +784,7 @@ class RW4Exporter:
 		# For each object, create a vertex and index buffer
 
 		# When there is BlendShape, Spore does not add the bone indices to the vertex format, I don't know why
-		vertex_desc = self.create_vertex_description(use_texcoord, use_bones and not use_shape_keys, use_tangent)
+		vertex_desc = self.create_vertex_description(use_texcoord, use_bones and not use_shape_keys, use_tangent, use_shape_keys)
 
 		vertices, triangles, indices_map = self.process_mesh(
 			obj, blender_mesh, use_texcoord, use_bones, not use_shape_keys)

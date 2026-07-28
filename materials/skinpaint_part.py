@@ -51,15 +51,13 @@ class SkinPaintPart(RWMaterial):
 
 		material.shader_id = 0x80000005 if exporter.is_blend_shape() else 0x80000004
 		material.unknown_booleans.append(True)  # the rest are going to be False
+		material.flags3 |= 0xc0000
 
 		# -- RENDER STATES -- #
 
 		material.set_render_states(rw4_material.alpha_type)
 
 		# -- SHADER CONSTANTS -- #
-
-		# Used for selecting skinPaint shader
-		material.add_shader_data(0x216, struct.pack('<i', 0))
 
 		if exporter.has_skeleton():
 			# In the shader, skinWeights.x = numWeights
@@ -81,12 +79,15 @@ class SkinPaintPart(RWMaterial):
 														render_ware.get_index(exporter.blend_shape,
 																			  rw4_base.INDEX_SUB_REFERENCE)))
 
+		# Used for selecting skinPaint shader
+		material.add_shader_data(0x216, struct.pack('<i', 0))
+
 		# -- TEXTURE SLOTS -- #
 
 		material.texture_slots.append(
 			RWTextureSlot(0, exporter.add_texture(rw4_material.material_data_SkinPaintPart.diffuse_texture)))
 
-		material.texture_slots.append(RWTextureSlot(1, None))
+		material.texture_slots.append(RWTextureSlot(1, None, disable_sampler_states=True))
 
 		return material
 

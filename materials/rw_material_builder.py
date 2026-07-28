@@ -45,6 +45,7 @@ ShaderData = namedtuple('ShaderData', ('index', 'offset', 'data'))
 SHADER_DATA = {
 	'skinWeights': 0x003,
 	'skinBones': 0x004,
+	'skinMorphDelta': 0x005,
 	'modelToClip': 0x006,
 	'modelToCamera': 0x007,
 	'modelToWorld': 0x008,
@@ -65,11 +66,20 @@ SHADER_DATA = {
 	'pulse': 0x028,
 	'worldToModel': 0x02A,
 
-	'objectTypeColor': 0x202,
+	'cubeMapData': 0x041,
+	'specMapData': 0x042,
+	'projectionData': 0x043,
+	'fresnelData': 0x044,
+
+	'renderType': 0x201,
+	'objectType': 0x202,
 	'frameInfo': 0x203,
 	'screenInfo': 0x204,
 	'mNoiseScale': 0x205,
 	'customParams': 0x206,
+	'nonUniformScale': 0x207,
+	'dofParams': 0x208,
+	'nDotLParams': 0x209,
 	'geomToRTT': 0x20A,
 	'geomToRTTViewTrans': 0x20B,
 	'tintParams': 0x20C,
@@ -80,6 +90,7 @@ SHADER_DATA = {
 	'editorColors': 0x213,
 	'dirLightsWorld': 0x214,
 	'dirLightsModel': 0x215,
+	'identity': 0x218, # kShaderDataIDIdentity
 	'sunDirAndCelStrength': 0x219,
 	'shCoeffs': 0x21A,
 	'cameraDisntace': 0x21B,
@@ -110,8 +121,9 @@ SHADER_DATA = {
 	'gameInfo': 0x248,
 	'ramp': 0x24A,
 	'sunDir': 0x24B,
-	'tramp': 0x24C,
-	'terrainLighting': 0x24D,
+	'tramp': 0x24C, # Doesnt match F08?
+	'terrainLighting': 0x24D, # Doesnt match F08?
+	'appFlags': 0x24E,
 	'beachColor': 0x250,
 	'cliffColor': 0x251,
 	'viewTransform': 0x252,
@@ -293,7 +305,7 @@ class RWMaterialBuilder:
 								  flags1,
 								  flags2,
 								  flags3,
-								  0,  # field_14, also ussed as flags
+								  0,  # field_14, also used as flags
 								  self.shader_id,
 								  0  # just padding
 								  ))
@@ -518,10 +530,8 @@ class RWMaterialBuilder:
 		material. Returns CUSTOM if it cannot be detected.
 		"""
 
-		print(self.render_states)
 		# If we found a matching alpha mode, return it
 		for alpha_mode, states in alpha_modes.items():
-			print(alpha_mode, states)
 			if all(state in states and states[state] == value for state, value in self.render_states.items()):
 				return alpha_mode.split('-')[0]
 		
@@ -533,5 +543,4 @@ class RWMaterialBuilder:
 		:param render_state: The render state to set
 		:param value: The value to set. If None, the state will be removed.
 		"""
-		#if value > 0:
 		self.render_states[render_state] = value

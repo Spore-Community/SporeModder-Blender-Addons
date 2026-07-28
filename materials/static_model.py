@@ -12,6 +12,10 @@ from bpy.props import (StringProperty,
 					   PointerProperty
 					   )
 
+SHADER_STATIC = 0x80000002
+SHADER_UNK1 = 0x80000003 # Editor Background?
+SHADER_SKELETON = 0x80000004
+
 class StaticModel(RWMaterial):
 	material_name = "Static Model"
 	material_description = "A simple static model which allows normal maps, used for props, backgrounds, etc."
@@ -64,14 +68,14 @@ class StaticModel(RWMaterial):
 
 	tint_mode: EnumProperty(
 			name="Tint Mode",
-			items=[('DEFAULT', 'Default', "The material can apply vertex color"),
+			items=[('DEFAULT', 'Default', "The material can apply identity color"),
 				   ('TERRAIN', "Terrain", "The material can be tinted by the terrain color"),],
 			default='DEFAULT'
 		)
 
-	use_vertex_color: BoolProperty(
-		name="Use Vertex Color",
-		description="Use vertex color in the non-terrain tint path.",
+	use_identity_color: BoolProperty(
+		name="Use Identity Color",
+		description="Tints the model based on identity color, masked visible by the diffuse alpha value.",
 		default=1
 	)
 
@@ -114,7 +118,7 @@ class StaticModel(RWMaterial):
 			box.prop(data, 'tint_terrain')
 			box.prop(data, 'tint_deadterrain')
 		else:
-			box.prop(data, 'use_vertex_color')
+			box.prop(data, 'use_identity_color')
 
 	@staticmethod
 	def get_material_builder(exporter, rw4_material):
@@ -124,12 +128,14 @@ class StaticModel(RWMaterial):
 
 		RWMaterial.set_general_settings(material, rw4_material, material_data)
 
-		if exporter.has_skeleton() or exporter.is_blend_shape(): material.shader_id = 0x80000004
-		else: material.shader_id = 0x80000002
+		if exporter.has_skeleton() or exporter.is_blend_shape(): material.shader_id = SHADER_SKELETON
+		else: material.shader_id = SHADER_STATIC
 		material.unknown_booleans.append(True)
 
-		if material.shader_id == 0x80000004:
-			material.FLAG3_RENDER_STATES = 0xc0000
+		# TODO: this also appears on some STATIC shader objects...
+		# What are its conditions?
+		#if material.shader_id == SHADER_SKELETON:
+		material.flags3 |= 0xc0000
 		
 		# -- SHADER CONSTANTS -- #
 
@@ -148,14 +154,14 @@ class StaticModel(RWMaterial):
 		# add showIdentityPS -hasData identityColor 0x218 -exclude 0x200
 		# add restoreAlphaPS -hasData 0x218 -exclude 0x200
 		if material_data.tint_mode == 'TERRAIN':
-			material.FLAG3_RENDER_STATES |= 0xc0000
+			material.flags3 |= 0xc0000
 			if material_data.tint_terrain:
 				material.add_shader_data(SHADER_DATA['terrainTint'], struct.pack('<i', 0x41200000))
 			if material_data.tint_deadterrain:
 				material.add_shader_data(SHADER_DATA['deadTerrainTint'], struct.pack('<i', 0x41200000))
 		else:
-			if material_data.use_vertex_color:
-				material.add_shader_data(0x218, struct.pack('<i', 0x028B7C00))
+			if material_data.use_identity_color:
+				material.add_shader_data(SHADER_DATA['identity'], struct.pack('<i', 0)) #0x028B7C00
 
 		# -- RENDER STATES -- #
 		render_ware = exporter.render_ware
@@ -227,18 +233,18 @@ class StaticModel(RWMaterial):
 
 		terrain_tint = material.get_shader_data(SHADER_DATA['terrainTint'])
 		dead_terrain_tint = material.get_shader_data(SHADER_DATA['deadTerrainTint'])
-		vertex_color = material.get_shader_data(0x218)
+		identity_color = material.get_shader_data(SHADER_DATA['identity'])
 
 		material_data.tint_terrain = terrain_tint is not None
 		material_data.tint_deadterrain = dead_terrain_tint is not None
-		material_data.use_vertex_color = False
+		material_data.use_identity_color = False
 
 		if material_data.tint_terrain or material_data.tint_deadterrain:
 			material_data.tint_mode = 'TERRAIN'
 		else:
 			material_data.tint_mode = 'DEFAULT'
-			if vertex_color is not None and len(vertex_color.data) == struct.calcsize('<i'):
-				material_data.use_vertex_color = struct.unpack('<i', vertex_color.data)[0] == 0x028B7C00
+			if identity_color is not None and len(identity_color.data) == struct.calcsize('<i'):
+				material_data.use_identity_color = struct.unpack('<i', identity_color.data)[0] >= 0
 
 		return True
 
